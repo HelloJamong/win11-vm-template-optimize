@@ -68,6 +68,7 @@ win11-vm-template-optimize/
 ├─ README.md
 ├─ LICENSE
 ├─ NOTICE.md
+├─ CHANGELOG.md
 ├─ .gitignore
 ├─ docs/
 │  ├─ build-process.md
@@ -92,6 +93,7 @@ win11-vm-template-optimize/
    └─ post-build-checklist.md
 ```
 
+- `CHANGELOG.md`: 연도.메이저버전.마이너버전 형식의 공식 변경 이력
 - `docs/`: 템플릿 생성, 정리 항목, Sysprep, 감사 대응, 변경 이력 템플릿 문서
 - `scripts/`: Audit Mode에서 실행할 단일 PowerShell 스크립트, Sysprep 응답 파일, 압축 보조 스크립트
 - `configs/`: 제거/비활성화 후보 목록 및 정책 레지스트리 설명
@@ -278,4 +280,4 @@ Sysprep이 완료되면 VM은 자동 종료됩니다. 종료된 상태를 마스
 - 오프라인/망분리 환경용 패키지 반입 체크리스트 추가
 - PowerShell Pester 기반 정적 검증 테스트 추가
 - VHD 후처리 절차와 압축 검증 자동화 문서 보강
-- 변경 이력 템플릿 기반 릴리스 노트 운영
+- `CHANGELOG.md` 기반 릴리스 노트 운영
