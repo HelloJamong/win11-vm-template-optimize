@@ -161,6 +161,7 @@ Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
 - 서비스 비활성화
 - 예약 작업 비활성화
 - Search/Bing/Copilot/Recall/Consumer/privacy 정책 설정
+- 전원 계획, 탐색기 개인정보, 시작 메뉴, 작업표시줄, 잠금화면 콘텐츠 정리
 - cleanmgr 실행
 - DISM component cleanup 실행
 

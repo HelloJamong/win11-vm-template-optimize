@@ -39,3 +39,11 @@ Microsoft.OutlookForWindows
 *Copilot*
 *Teams*
 *GamingApp*
+*3DBuilder*
+*SkypeApp*
+*OneNote*
+*Sway*
+*Holographic*
+*QuickAssist*
+*Wallet*
+*ConnectivityStore*

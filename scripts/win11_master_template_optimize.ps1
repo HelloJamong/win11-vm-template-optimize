@@ -158,6 +158,26 @@ $EnableExplorerTweaks              = $true
 # Explorer 알림/동기화 알림과 일부 UI 기본값을 조정합니다.
 # false면 UI 관련 기본값이 원래 상태에 가깝게 유지됩니다.
 
+$EnablePowerPlanTweaks             = $true
+# VM 템플릿에 적합하도록 고성능 전원 계획과 절전/화면 꺼짐 시간 제한을 조정합니다.
+# 노트북 실사용 이미지나 절전 정책이 있는 조직에서는 false를 검토하십시오.
+
+$EnableExplorerPrivacyCleanup      = $true
+# 파일 탐색기 최근 항목, 실행 기록, 입력 경로 등 사용자 흔적성 데이터를 정리하고 재표시를 제한합니다.
+# 템플릿 마감 전 흔적 최소화 목적에 적합합니다.
+
+$EnableStartMenuTweaks             = $true
+# 시작 메뉴의 최근/추천/계정 알림성 표시를 줄입니다.
+# 사용자 경험 변경이 있으므로 조직 표준 UI가 있으면 검토하십시오.
+
+$EnableTaskbarAndNotificationTweaks = $true
+# Widgets, Task View, Windows 환영/추천/팁 알림을 줄입니다.
+# 공공기관/망분리 환경의 불필요한 소비자 경험 축소 목적입니다.
+
+$EnableLockScreenContentTweaks     = $true
+# 잠금화면 Spotlight, 팁, 추천 콘텐츠, 슬라이드쇼성 표시를 줄입니다.
+# 조직 표준 잠금화면 정책이 별도로 있으면 GPO가 우선할 수 있습니다.
+
 $EnableDeliveryOptimizationTweaks  = $true
 # Delivery Optimization의 외부 공유 성격을 줄입니다.
 # false면 업데이트 공유/캐시 관련 기본 동작이 더 남을 수 있습니다.
@@ -308,6 +328,21 @@ function Set-RegDword {
 # 정책/설정을 레지스트리에 DWORD로 기록합니다.
 # 값 수정 시 기능 비활성/활성 정책이 바뀝니다.
 
+function Remove-RegistryKeySafe {
+    param([string]$Path)
+
+    try {
+        if (Test-Path -Path $Path) {
+            Remove-Item -Path $Path -Recurse -Force -ErrorAction SilentlyContinue
+            Write-Log "Registry key removed: $Path"
+        }
+    }
+    catch {
+        Write-Log "Registry key removal failed: $Path" 'WARN'
+    }
+}
+# 최근 항목, 실행 기록 등 템플릿에 남기지 않을 사용자 흔적성 레지스트리 키를 안전하게 제거합니다.
+
 function Stop-ServiceSafe {
     param([string]$Name)
     try {
@@ -405,6 +440,11 @@ function Apply-ModePreset {
             EnableRecallTweaks               = $true
             EnablePrivacyTweaks              = $true
             EnableExplorerTweaks             = $false
+            EnablePowerPlanTweaks            = $false
+            EnableExplorerPrivacyCleanup     = $true
+            EnableStartMenuTweaks            = $false
+            EnableTaskbarAndNotificationTweaks = $false
+            EnableLockScreenContentTweaks    = $true
             EnableDeliveryOptimizationTweaks = $true
             EnableOneDriveRemoval            = $false
             EnablePagefileDisable            = $false
@@ -432,6 +472,11 @@ function Apply-ModePreset {
             EnableRecallTweaks               = $true
             EnablePrivacyTweaks              = $true
             EnableExplorerTweaks             = $true
+            EnablePowerPlanTweaks            = $true
+            EnableExplorerPrivacyCleanup     = $true
+            EnableStartMenuTweaks            = $true
+            EnableTaskbarAndNotificationTweaks = $true
+            EnableLockScreenContentTweaks    = $true
             EnableDeliveryOptimizationTweaks = $true
             EnableOneDriveRemoval            = $false
             EnablePagefileDisable            = $false
@@ -459,6 +504,11 @@ function Apply-ModePreset {
             EnableRecallTweaks               = $true
             EnablePrivacyTweaks              = $true
             EnableExplorerTweaks             = $true
+            EnablePowerPlanTweaks            = $true
+            EnableExplorerPrivacyCleanup     = $true
+            EnableStartMenuTweaks            = $true
+            EnableTaskbarAndNotificationTweaks = $true
+            EnableLockScreenContentTweaks    = $true
             EnableDeliveryOptimizationTweaks = $true
             EnableOneDriveRemoval            = $true
             EnablePagefileDisable            = $true
@@ -703,6 +753,40 @@ if ($EnableHibernationOff) {
 # hiberfil.sys 제거
 
 # -----------------------------
+# Power Plan / Sleep Tweaks
+# -----------------------------
+if ($EnablePowerPlanTweaks) {
+    Write-Log 'Applying VM power plan and sleep/display timeout tweaks'
+
+    try {
+        powercfg /setactive SCHEME_MIN | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            powercfg /duplicatescheme 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c | Out-Null
+            powercfg /setactive SCHEME_MIN | Out-Null
+        }
+    }
+    catch {
+        Write-Log 'High performance power plan activation failed or is not supported on this build.' 'WARN'
+    }
+
+    try {
+        powercfg /change monitor-timeout-ac 0 | Out-Null
+        powercfg /change monitor-timeout-dc 0 | Out-Null
+        powercfg /change standby-timeout-ac 0 | Out-Null
+        powercfg /change standby-timeout-dc 0 | Out-Null
+        powercfg /change hibernate-timeout-ac 0 | Out-Null
+        powercfg /change hibernate-timeout-dc 0 | Out-Null
+    }
+    catch {
+        Write-Log 'Power timeout configuration failed.' 'WARN'
+    }
+
+    Set-RegDword 'HKCU:\Control Panel\PowerCfg' 'GlobalFlags' 0
+    Set-RegDword 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FlyoutMenuSettings' 'ShowLockOption' 0
+}
+# VM 템플릿에서 불필요한 절전/화면 꺼짐으로 작업이 중단되지 않도록 보수적으로 전원 시간을 해제합니다.
+
+# -----------------------------
 # Optional Pagefile Disable
 # -----------------------------
 if ($EnablePagefileDisable) {
@@ -890,6 +974,76 @@ if ($EnableExplorerTweaks) {
     Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' 'LaunchTo' 1
 }
 # 동기화 공급자 알림 줄이기, Explorer 기본 시작 위치 조정
+
+# -----------------------------
+# Explorer Privacy Cleanup
+# -----------------------------
+if ($EnableExplorerPrivacyCleanup) {
+    Write-Log 'Applying Explorer privacy cleanup'
+
+    Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer' 'ShowRecent' 0
+    Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer' 'ShowFrequent' 0
+    Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer' 'ShowCloudFilesInQuickAccess' 0
+    Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' 'Start_TrackDocs' 0
+
+    Remove-RegistryKeySafe 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\RecentDocs'
+    Remove-RegistryKeySafe 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\RunMRU'
+    Remove-RegistryKeySafe 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\TypedPaths'
+    Remove-RegistryKeySafe 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\WordWheelQuery'
+
+    Remove-ChildrenIfExists (Join-Path $env:APPDATA 'Microsoft\Windows\Recent')
+    Remove-ChildrenIfExists (Join-Path $env:APPDATA 'Microsoft\Windows\Recent\AutomaticDestinations')
+    Remove-ChildrenIfExists (Join-Path $env:APPDATA 'Microsoft\Windows\Recent\CustomDestinations')
+}
+# 파일 탐색기 최근 파일/폴더, 실행 기록, 주소 입력 기록, 검색어 기록을 줄여 템플릿 흔적을 최소화합니다.
+
+# -----------------------------
+# Start Menu Tweaks
+# -----------------------------
+if ($EnableStartMenuTweaks) {
+    Write-Log 'Applying Start menu recommendation tweaks'
+
+    Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Start' 'ShowRecentList' 0
+    Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Start' 'ShowFrequentList' 0
+    Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Start' 'ShowRecommendations' 0
+    Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' 'Start_TrackDocs' 0
+    Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' 'Start_TrackProgs' 0
+    Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager' 'SubscribedContent-338388Enabled' 0
+    Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager' 'SubscribedContent-338389Enabled' 0
+}
+# 시작 메뉴 최근/추천/계정 알림성 표시를 제한합니다.
+
+# -----------------------------
+# Taskbar / Notification Tweaks
+# -----------------------------
+if ($EnableTaskbarAndNotificationTweaks) {
+    Write-Log 'Applying taskbar and notification tweaks'
+
+    Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' 'ShowTaskViewButton' 0
+    Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' 'TaskbarDa' 0
+    Set-RegDword 'HKLM:\SOFTWARE\Policies\Microsoft\Dsh' 'AllowNewsAndInterests' 0
+    Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager' 'SubscribedContent-310093Enabled' 0
+    Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager' 'SubscribedContent-338393Enabled' 0
+    Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager' 'SubscribedContent-353694Enabled' 0
+    Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager' 'SubscribedContent-353696Enabled' 0
+    Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\UserProfileEngagement' 'ScoobeSystemSettingEnabled' 0
+}
+# Widgets, Task View, Windows 환영 경험, 설정 완료 추천, 팁/추천 알림을 줄입니다.
+
+# -----------------------------
+# Lock Screen Content Tweaks
+# -----------------------------
+if ($EnableLockScreenContentTweaks) {
+    Write-Log 'Applying lock screen content tweaks'
+
+    Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager' 'RotatingLockScreenEnabled' 0
+    Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager' 'RotatingLockScreenOverlayEnabled' 0
+    Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager' 'SubscribedContent-338387Enabled' 0
+    Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager' 'LockScreenOverlayEnabled' 0
+    Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager' 'SoftLandingEnabled' 0
+    Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Lock Screen' 'SlideshowEnabled' 0
+}
+# 잠금화면 Spotlight, 팁, 추천 콘텐츠, 슬라이드쇼성 표시를 줄입니다.
 
 # -----------------------------
 # Optional Windows Feature Disable

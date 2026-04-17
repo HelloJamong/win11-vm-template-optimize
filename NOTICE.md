@@ -13,7 +13,7 @@
 ### Win11Debloat
 
 - 프로젝트: Win11Debloat
-- 저장소: https://github.com/Raphire/Win11Debloat
+- 저장소: [프로젝트 바로가기](https://github.com/Raphire/Win11Debloat)
 - 라이선스: MIT License
 - 참고 범위:
   - Windows 10/11 기본 앱 제거 후보 분류
@@ -26,7 +26,7 @@
 ### WinUtil
 
 - 프로젝트: WinUtil
-- 저장소: https://github.com/ChrisTitusTech/winutil
+- 저장소: [프로젝트 바로가기](https://github.com/ChrisTitusTech/winutil)
 - 라이선스: MIT License
 - 참고 범위:
   - Windows 최적화 항목을 선택형 옵션으로 분리하는 구성 방식
@@ -39,7 +39,7 @@
 ### Virtual-Desktop-Optimization-Tool
 
 - 프로젝트: Virtual-Desktop-Optimization-Tool
-- 저장소: https://github.com/The-Virtual-Desktop-Team/Virtual-Desktop-Optimization-Tool
+- 저장소: [프로젝트 바로가기](https://github.com/The-Virtual-Desktop-Team/Virtual-Desktop-Optimization-Tool)
 - 참고 범위:
   - 가상 데스크톱/VDI 환경에서 성능, 정책, 서비스, 예약 작업을 분류해 적용하는 운영 개념
   - 템플릿 이미지 최적화 전후 검증이 필요하다는 운영 관점
