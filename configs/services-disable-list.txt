@@ -1,0 +1,18 @@
+# 서비스 비활성화 후보 목록
+# 서비스 이름(ServiceName)을 한 줄에 하나씩 작성합니다.
+# Windows 버전/에디션/조직 정책에 따라 존재하지 않을 수 있습니다.
+
+DiagTrack
+dmwappushservice
+MapsBroker
+OneSyncSvc
+RetailDemo
+WerSvc
+XboxGipSvc
+XblAuthManager
+XblGameSave
+XboxNetApiSvc
+PhoneSvc
+Fax
+RemoteRegistry
+WalletService
