@@ -1,16 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <unattend xmlns="urn:schemas-microsoft-com:unattend">
   <settings pass="oobeSystem">
-    <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-      <TimeZone>Korea Standard Time</TimeZone>
-      <!-- 실제 적용 전 &lt;ProfileDrive&gt;를 조직 표준 사용자 프로필 드라이브 문자로 치환하십시오. -->
+    <component name="Microsoft-Windows-Shell-Setup"
+               processorArchitecture="amd64"
+               publicKeyToken="31bf3856ad364e35"
+               language="neutral"
+               versionScope="nonSxS">
+
+      <!--
+        사용자 프로필 경로 설정
+        - Sysprep unattend.xml은 환경 변수처럼 드라이브 문자를 동적으로 치환하지 않습니다.
+        - 실제 Sysprep 실행 전 아래 <ProfileDrive>를 조직 표준 사용자 프로필 드라이브 문자로 변경하십시오.
+        - 예: E:\Users, F:\Users 등 OS 드라이브가 아닌 별도 사용자 프로필 드라이브 경로
+        - 해당 드라이브와 Users 폴더는 Sysprep 실행 전에 먼저 준비되어 있어야 합니다.
+      -->
       <FolderLocations>
         <ProfilesDirectory>&lt;ProfileDrive&gt;:\Users</ProfilesDirectory>
       </FolderLocations>
-      <OOBE>
-        <HideEULAPage>true</HideEULAPage>
-        <ProtectYourPC>3</ProtectYourPC>
-      </OOBE>
+
+      <TimeZone>Korea Standard Time</TimeZone>
+
     </component>
   </settings>
 </unattend>
