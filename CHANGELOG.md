@@ -6,6 +6,39 @@
 - `메이저버전`: 프로젝트 기준선 또는 운영 방식이 크게 바뀌는 변경입니다.
 - `마이너버전`: 동일 메이저 기준선 안에서 누적되는 기능/문서/검증 개선 변경입니다.
 
+## [26.1.7] - 2026-04-18
+
+### Added
+
+- PowerShell 콘솔 한글 깨짐 방지를 위해 스크립트 최상단에 UTF-8 인코딩 설정을 추가했습니다.
+  - `[Console]::OutputEncoding`, `[Console]::InputEncoding`, `$OutputEncoding`을 UTF-8로 고정합니다.
+  - Windows PowerShell 5.x 환경에서는 파일 자체도 UTF-8 with BOM으로 저장해야 합니다.
+- VDOT(Virtual Desktop Optimization Tool) 기준 Microsoft Edge 최적화 섹션(`$EnableEdgeTweaks`)을 추가했습니다.
+  - 백그라운드 실행 차단: `BackgroundModeEnabled=0`
+  - 시작 부스트 및 사전 로드 차단: `StartupBoostEnabled=0`, `AllowPrelaunch=0`, `AllowTabPreloading=0`
+  - 첫 실행 스플래시 숨김: `HideFirstRunExperience=1`, `PreventFirstRunPage=1`
+  - 제품 내 추천/위젯 비활성화: `ShowRecommendationsEnabled=0`, `WebWidgetAllowed=0`
+  - 효율성 모드(비활성 탭 슬립) 비활성화: `EfficiencyMode=0`
+  - 자동완성 전체 비활성화: `AutofillAddressEnabled=0`, `AutofillCreditCardEnabled=0`, `PasswordManagerEnabled=0`
+  - 새 탭 사전 렌더링 비활성화: `NewTabPagePrerenderEnabled=0`
+  - 네트워크 예측/DNS 프리페치 비활성화: `NetworkPredictionOptions=2`
+  - 하드웨어 가속 명시적 활성화 유지: `HardwareAccelerationModeEnabled=1`
+  - 레거시 EdgeHTML 정책, EdgeUI 스와이프/MFU 추적, EdgeUpdate 업무 시간대 업데이트 억제 포함
+  - 세 모드(lite/standard/advanced) 모두 기본 활성화
+
+### Changed
+
+- `--interactive` 옵션을 폐지하고 인터랙티브 모드를 기본 동작으로 변경했습니다.
+  - `$Script:Interactive` 기본값: `$false → $true`
+  - 별도 옵션 없이 항상 각 단계마다 Y/n 확인 후 진행합니다.
+- `standard` 모드의 `EnableOneDriveRemoval` 기본값을 `$false → $true`로 변경했습니다.
+
+### Verification
+
+- 스크립트 인수 파싱 로직에서 `--interactive` 관련 케이스 제거 확인
+- `Apply-ModePreset` 세 모드에 `EnableEdgeTweaks` 등록 확인
+- Edge 정책 키 경로(`HKLM:\SOFTWARE\Policies\Microsoft\Edge`) 확인
+
 ## [26.1.6] - 2026-04-17
 
 ### Removed

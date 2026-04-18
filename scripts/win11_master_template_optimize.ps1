@@ -18,38 +18,47 @@
     .\win11_master_template_optimize.ps1 --lite
 
 .MODE
-    --standard : 기본값. 기존 standard 프로필에 해당하는 균형형 최적화입니다.
-    --advanced : 기존 aggressive 설정에 해당하는 강한 정리/비활성화 모드입니다.
-    --lite     : 기존 conservative 설정에 해당하는 보수적/저위험 모드입니다.
+    --standard    : 기본값. 기존 standard 프로필에 해당하는 균형형 최적화입니다.
+    --advanced    : 기존 aggressive 설정에 해당하는 강한 정리/비활성화 모드입니다.
+    --lite        : 기존 conservative 설정에 해당하는 보수적/저위험 모드입니다.
 
 .NOTES
+    - 각 단계마다 수행 항목을 표시하고 Y/n으로 진행 여부를 선택하는 인터랙티브 모드가 기본값입니다.
     - 공공기관/망분리 환경의 최초 검증은 --lite 모드를 권장합니다.
     - 이벤트 로그 삭제, Appx 제거, 서비스 비활성화는 감사/업무 영향이 있을 수 있습니다.
     - 앱/서비스/예약 작업 후보는 configs 디렉터리의 목록 파일과 스크립트 기본 후보를 함께 사용합니다.
 #>
+
+# PowerShell 5.x(Windows PowerShell)에서 한글 깨짐 방지: 콘솔 입출력 인코딩을 UTF-8로 고정합니다.
+# 파일 자체도 UTF-8 with BOM으로 저장해야 Windows PowerShell 5.x에서 한글이 정상 표시됩니다.
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+[Console]::InputEncoding  = [System.Text.Encoding]::UTF8
+$OutputEncoding           = [System.Text.Encoding]::UTF8
 
 function Show-Usage {
     Write-Host '사용법:'
     Write-Host '  .\win11_master_template_optimize.ps1 [--standard|--advanced|--lite]'
     Write-Host ''
     Write-Host '모드:'
-    Write-Host '  --standard  기본값. 성능/용량 균형형 최적화입니다.'
-    Write-Host '  --advanced  기존 aggressive에 해당하는 강한 정리/비활성화 모드입니다.'
-    Write-Host '  --lite      기존 conservative에 해당하는 보수적/저위험 모드입니다.'
+    Write-Host '  --standard    기본값. 성능/용량 균형형 최적화입니다.'
+    Write-Host '  --advanced    기존 aggressive에 해당하는 강한 정리/비활성화 모드입니다.'
+    Write-Host '  --lite        기존 conservative에 해당하는 보수적/저위험 모드입니다.'
     Write-Host ''
     Write-Host 'PowerShell 관례에 맞게 -standard, -advanced, -lite 형식도 허용합니다.'
+    Write-Host '인터랙티브 모드(각 단계 Y/n 확인)는 기본 동작입니다.'
 }
 
 $RawArguments = @($args)
 $Script:SelectedMode = 'standard'
+$Script:Interactive = $true
 $selectedModes = New-Object System.Collections.Generic.List[string]
 
 foreach ($arg in $RawArguments) {
     switch -Regex ($arg.ToLowerInvariant()) {
-        '^(--|-|/)standard$' { $selectedModes.Add('standard'); continue }
-        '^(--|-|/)advanced$' { $selectedModes.Add('advanced'); continue }
-        '^(--|-|/)lite$' { $selectedModes.Add('lite'); continue }
-        '^(--|-|/)(help|h|\?)$' { Show-Usage; exit 0 }
+        '^(--|-|/)standard$'     { $selectedModes.Add('standard'); continue }
+        '^(--|-|/)advanced$'     { $selectedModes.Add('advanced'); continue }
+        '^(--|-|/)lite$'         { $selectedModes.Add('lite'); continue }
+        '^(--|-|/)(help|h|\?)$'  { Show-Usage; exit 0 }
         default {
             Write-Host "알 수 없는 옵션: $arg"
             Show-Usage
@@ -182,9 +191,13 @@ $EnableDeliveryOptimizationTweaks  = $true
 # Delivery Optimization의 외부 공유 성격을 줄입니다.
 # false면 업데이트 공유/캐시 관련 기본 동작이 더 남을 수 있습니다.
 
-$EnableOneDriveRemoval             = $false
+$EnableOneDriveRemoval             = $true
 # OneDrive 제거 시도 옵션입니다.
-# 조직 정책이나 특정 업무 요구가 있으면 false 유지 권장.
+# 조직 정책이나 특정 업무 요구가 있으면 false로 변경하십시오.
+
+$EnableEdgeTweaks                  = $true
+# VDOT 기준 Edge Chromium 정책 키를 적용합니다.
+# 백그라운드 실행, 시작 부스트, 첫 실행 화면, 위젯, 텔레메트리 등을 비활성화합니다.
 
 $EnablePagefileDisable             = $false
 # pagefile 자동 관리를 끄고 pagefile 삭제를 시도합니다.
@@ -233,6 +246,43 @@ function Write-Log {
 }
 # 화면 출력 + 로그 파일 저장을 동시에 수행합니다.
 # 문제 발생 시 어떤 작업까지 진행됐는지 확인하는 용도입니다.
+
+# -----------------------------
+# Interactive Confirm
+# -----------------------------
+function Confirm-Step {
+    param(
+        [Parameter(Mandatory = $true)][string]$Title,
+        [string[]]$Details = @()
+    )
+
+    if (-not $Script:Interactive) { return $true }
+
+    Write-Host ''
+    Write-Host ('=' * 60) -ForegroundColor DarkCyan
+    Write-Host "  $Title" -ForegroundColor Cyan
+    Write-Host ('=' * 60) -ForegroundColor DarkCyan
+
+    if ($Details.Count -gt 0) {
+        foreach ($d in $Details) {
+            Write-Host "  - $d" -ForegroundColor Gray
+        }
+    }
+
+    Write-Host ''
+    $answer = Read-Host '  진행하시겠습니까? [Y/n]'
+    $proceed = ($answer -eq '' -or $answer -match '^[Yy]')
+
+    if (-not $proceed) {
+        Write-Host "  -> 건너뜁니다: $Title" -ForegroundColor Yellow
+        Write-Log "사용자가 건너뜀: $Title" 'WARN'
+    }
+
+    return $proceed
+}
+# --interactive 모드일 때만 프롬프트를 표시합니다.
+# 비대화형 실행(스크립트/자동화)에서는 항상 true를 반환합니다.
+# 엔터 입력(기본값) 또는 Y/y는 진행, n/N은 건너뜁니다.
 
 # -----------------------------
 # Helpers
@@ -447,6 +497,7 @@ function Apply-ModePreset {
             EnableLockScreenContentTweaks    = $true
             EnableDeliveryOptimizationTweaks = $true
             EnableOneDriveRemoval            = $false
+            EnableEdgeTweaks                 = $true
             EnablePagefileDisable            = $false
             EnableOptionalFeatureDisable     = $false
             EnableDownloadsDesktopCleanup    = $false
@@ -478,7 +529,8 @@ function Apply-ModePreset {
             EnableTaskbarAndNotificationTweaks = $true
             EnableLockScreenContentTweaks    = $true
             EnableDeliveryOptimizationTweaks = $true
-            EnableOneDriveRemoval            = $false
+            EnableOneDriveRemoval            = $true
+            EnableEdgeTweaks                 = $true
             EnablePagefileDisable            = $false
             EnableOptionalFeatureDisable     = $false
             EnableDownloadsDesktopCleanup    = $false
@@ -511,6 +563,7 @@ function Apply-ModePreset {
             EnableLockScreenContentTweaks    = $true
             EnableDeliveryOptimizationTweaks = $true
             EnableOneDriveRemoval            = $true
+            EnableEdgeTweaks                 = $true
             EnablePagefileDisable            = $true
             EnableOptionalFeatureDisable     = $true
             EnableDownloadsDesktopCleanup    = $true
@@ -542,6 +595,9 @@ function Write-OptionSummary {
 
 Write-Log "=== Optimization Start ==="
 Write-Log "로그 파일: $Script:LogFile"
+if ($Script:Interactive) {
+    Write-Log '대화형 모드: 각 단계마다 Y/n 확인 후 진행합니다.'
+}
 Apply-ModePreset -ModeName $Script:SelectedMode
 Write-OptionSummary
 
@@ -627,7 +683,22 @@ if ($EnableUpdateCacheCleanup -or $EnableTempCleanup) {
 # -----------------------------
 # Temp / Cache Cleanup
 # -----------------------------
-if ($EnableTempCleanup) {
+$tempDetails = @(
+    'Windows\Temp, Prefetch, Minidump 삭제',
+    'SoftwareDistribution\Download, DeliveryOptimization 삭제',
+    'System32\LogFiles, $Recycle.Bin 삭제',
+    'MEMORY.DMP 삭제',
+    '사용자 AppData Temp, INetCache, Explorer 캐시, D3DSCache, CrashDumps 삭제',
+    'UWP 앱 패키지 TempState, LocalCache 삭제'
+)
+if ($EnableSetupLogCleanup) {
+    $tempDetails += 'Panther, Sysprep\Panther, Logs\DISM, Logs\CBS 삭제 (설치/배포 분석 로그)'
+}
+if ($EnableDownloadsDesktopCleanup) {
+    $tempDetails += '사용자 Downloads, Desktop 내용 삭제'
+}
+
+if ($EnableTempCleanup -and (Confirm-Step -Title '[1/14] 임시 파일 및 캐시 정리' -Details $tempDetails)) {
     $SystemCleanupPaths = @(
         "$env:SystemRoot\Temp",
         "$env:SystemRoot\Prefetch",
@@ -713,7 +784,10 @@ if ($EnableTempCleanup) {
 # -----------------------------
 # Update Cache Cleanup
 # -----------------------------
-if ($EnableUpdateCacheCleanup) {
+if ($EnableUpdateCacheCleanup -and (Confirm-Step -Title '[2/14] Windows Update 캐시 정리' -Details @(
+    'SoftwareDistribution\Download 삭제',
+    'SoftwareDistribution\DeliveryOptimization 삭제'
+))) {
     Remove-ChildrenIfExists "$env:SystemRoot\SoftwareDistribution\Download"
     Remove-ChildrenIfExists "$env:SystemRoot\SoftwareDistribution\DeliveryOptimization"
 }
@@ -722,7 +796,10 @@ if ($EnableUpdateCacheCleanup) {
 # -----------------------------
 # Defender Cleanup
 # -----------------------------
-if ($EnableDefenderCleanup) {
+if ($EnableDefenderCleanup -and (Confirm-Step -Title '[3/14] Windows Defender 검사 기록 정리' -Details @(
+    'Windows Defender\Scans\History 삭제',
+    'Windows Defender\Scans\Tmp 삭제'
+))) {
     Remove-ChildrenIfExists 'C:\ProgramData\Microsoft\Windows Defender\Scans\History'
     Remove-ChildrenIfExists 'C:\ProgramData\Microsoft\Windows Defender\Scans\Tmp'
 }
@@ -731,7 +808,10 @@ if ($EnableDefenderCleanup) {
 # -----------------------------
 # Event Logs Cleanup
 # -----------------------------
-if ($EnableEventLogClear) {
+if ($EnableEventLogClear -and (Confirm-Step -Title '[4/14] 이벤트 로그 초기화' -Details @(
+    'wevtutil로 전체 이벤트 로그 채널을 순회하며 초기화',
+    '경고: 장애 분석/감사 추적이 필요한 환경에서는 건너뛰십시오'
+))) {
     Write-Log 'Clearing event logs' 'WARN'
     try {
         wevtutil el | ForEach-Object {
@@ -746,7 +826,10 @@ if ($EnableEventLogClear) {
 # -----------------------------
 # Hibernation Off
 # -----------------------------
-if ($EnableHibernationOff) {
+if ($EnableHibernationOff -and (Confirm-Step -Title '[5/14] 최대 절전 비활성화' -Details @(
+    'powercfg -h off 실행',
+    'hiberfil.sys 제거 (수 GB 용량 확보)'
+))) {
     Write-Log 'Disabling hibernation'
     try { powercfg -h off | Out-Null } catch {}
 }
@@ -755,7 +838,11 @@ if ($EnableHibernationOff) {
 # -----------------------------
 # Power Plan / Sleep Tweaks
 # -----------------------------
-if ($EnablePowerPlanTweaks) {
+if ($EnablePowerPlanTweaks -and (Confirm-Step -Title '[6/14] 전원 계획 및 절전 설정 조정' -Details @(
+    '고성능 전원 계획(SCHEME_MIN) 활성화',
+    '모니터/절전/최대 절전 타임아웃 0으로 설정 (AC/DC 모두)',
+    '레지스트리: GlobalFlags=0, 잠금 화면 표시 옵션 조정'
+))) {
     Write-Log 'Applying VM power plan and sleep/display timeout tweaks'
 
     try {
@@ -789,7 +876,11 @@ if ($EnablePowerPlanTweaks) {
 # -----------------------------
 # Optional Pagefile Disable
 # -----------------------------
-if ($EnablePagefileDisable) {
+if ($EnablePagefileDisable -and (Confirm-Step -Title '[7/14] Pagefile 비활성화' -Details @(
+    '자동 pagefile 관리 해제 (wmic AutomaticManagedPagefile=False)',
+    'C:\pagefile.sys 삭제 시도',
+    '경고: 재부팅 후 검증 필요. 메모리 부족 시 시스템 불안정 가능'
+))) {
     Write-Log 'Disabling automatic pagefile management' 'WARN'
     try {
         wmic computersystem where name="%computername%" set AutomaticManagedPagefile=False | Out-Null
@@ -803,7 +894,12 @@ if ($EnablePagefileDisable) {
 # -----------------------------
 # Appx Removal
 # -----------------------------
-if ($EnableAppxRemoval) {
+if ($EnableAppxRemoval -and (Confirm-Step -Title '[8/14] Appx 앱 제거' -Details (@(
+    '제거 대상 패턴: Xbox, GamingApp, Clipchamp, Teams, BingNews, BingWeather',
+    '제거 대상 패턴: Maps, ZuneMusic, ZuneVideo, MicrosoftSolitaireCollection',
+    '제거 대상 패턴: People, WindowsFeedbackHub, GetHelp, Getstarted',
+    '제거 대상 패턴: YourPhone, CrossDevice, Copilot'
+) + $(if ($ConfigAppxPatterns.Count -gt 0) { @("configs/appx-remove-list.txt 추가 항목: $($ConfigAppxPatterns.Count)개") } else { @() })))) {
     Write-Log 'Removing selected Appx packages'
 
     foreach ($pattern in $AppxPatterns) {
@@ -822,7 +918,11 @@ if ($EnableAppxRemoval) {
 # -----------------------------
 # Provisioned Appx Removal
 # -----------------------------
-if ($EnableProvisionedAppxRemoval) {
+if ($EnableProvisionedAppxRemoval -and (Confirm-Step -Title '[9/14] Provisioned Appx 제거' -Details @(
+    '동일 패턴으로 Get-AppxProvisionedPackage 대상 제거',
+    '새 사용자 생성 시 앱이 다시 설치되지 않도록 방지',
+    'Appx 제거와 별도로 동작하므로 반드시 함께 실행 권장'
+))) {
     Write-Log 'Removing selected provisioned Appx packages'
 
     try {
@@ -841,7 +941,12 @@ if ($EnableProvisionedAppxRemoval) {
 # -----------------------------
 # OneDrive Removal (optional)
 # -----------------------------
-if ($EnableOneDriveRemoval) {
+if ($EnableOneDriveRemoval -and (Confirm-Step -Title '[10/14] OneDrive 제거' -Details @(
+    'OneDriveSetup.exe /uninstall 실행 (32bit/64bit 모두 시도)',
+    'ProgramData\Microsoft OneDrive 폴더 삭제',
+    'OneDriveTemp 폴더 삭제',
+    '경고: 조직 정책/업무 요구 확인 후 결정하십시오'
+))) {
     Write-Log 'Removing OneDrive' 'WARN'
     try {
         Start-Process "$env:SystemRoot\System32\OneDriveSetup.exe" '/uninstall' -Wait -NoNewWindow
@@ -859,7 +964,11 @@ if ($EnableOneDriveRemoval) {
 # -----------------------------
 # Service Optimization
 # -----------------------------
-if ($EnableServiceOptimization) {
+if ($EnableServiceOptimization -and (Confirm-Step -Title '[11/14] 서비스 비활성화' -Details (@(
+    'DiagTrack (진단 추적 서비스) -> Disabled',
+    'MapsBroker (지도 관련 서비스) -> Disabled',
+    'OneSyncSvc (계정 동기화 서비스) -> Disabled'
+) + $(if ($ConfigServicesToDisable.Count -gt 0) { @("configs/services-disable-list.txt 추가 항목: $($ConfigServicesToDisable.Count)개") } else { @() })))) {
     foreach ($svc in $ServicesToDisable) {
         Disable-ServiceSafe $svc
     }
@@ -872,7 +981,14 @@ if ($EnableServiceOptimization) {
 # -----------------------------
 # Scheduled Task Optimization
 # -----------------------------
-if ($EnableScheduledTaskOptimization) {
+if ($EnableScheduledTaskOptimization -and (Confirm-Step -Title '[12/14] 예약 작업 비활성화' -Details (@(
+    'Application Experience: Microsoft Compatibility Appraiser',
+    'Application Experience: ProgramDataUpdater',
+    'CEIP: Consolidator, UsbCeip',
+    'DiskDiagnostic: DiskDiagnosticDataCollector',
+    'Feedback\Siuf: DmClient, DmClientOnScenarioDownload',
+    'Maps: MapsUpdateTask'
+) + $(if ($ConfigTasksToDisable.Count -gt 0) { @("configs/tasks-disable-list.txt 추가 항목: $($ConfigTasksToDisable.Count)개") } else { @() })))) {
     Write-Log 'Disabling selected scheduled tasks'
     foreach ($taskRef in $TasksToDisable) {
         Disable-TaskByFullPath -TaskReference $taskRef
@@ -882,7 +998,14 @@ if ($EnableScheduledTaskOptimization) {
 # -----------------------------
 # Search / Bing / Cloud Search Tweaks
 # -----------------------------
-if ($EnableSearchTweaks) {
+if ($EnableSearchTweaks -and (Confirm-Step -Title '[13/14] 검색/Bing/클라우드 연계 차단 (레지스트리)' -Details @(
+    'AllowCortana = 0',
+    'DisableWebSearch = 1',
+    'ConnectedSearchUseWeb = 0',
+    'ConnectedSearchUseWebOverMeteredConnections = 0',
+    'AllowCloudSearch = 0',
+    'DisableSearchBoxSuggestions = 1'
+))) {
     Write-Log 'Applying search tweaks'
 
     Set-RegDword 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\Windows Search' 'AllowCortana' 0
@@ -897,7 +1020,10 @@ if ($EnableSearchTweaks) {
 # -----------------------------
 # Copilot Tweaks
 # -----------------------------
-if ($EnableCopilotTweaks) {
+if ($EnableCopilotTweaks -and (Confirm-Step -Title '[14/14] Copilot 비활성화 (레지스트리)' -Details @(
+    'HKLM: TurnOffWindowsCopilot = 1',
+    'HKCU: TurnOffWindowsCopilot = 1'
+))) {
     Write-Log 'Applying Copilot tweaks'
 
     Set-RegDword 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot' 'TurnOffWindowsCopilot' 1
@@ -908,7 +1034,12 @@ if ($EnableCopilotTweaks) {
 # -----------------------------
 # Recall Tweaks
 # -----------------------------
-if ($EnableRecallTweaks) {
+if ($EnableRecallTweaks -and (Confirm-Step -Title '[+] AI/Recall 기능 차단 (레지스트리)' -Details @(
+    'DisableAIDataAnalysis = 1',
+    'TurnOffSavingSnapshots = 1',
+    'AllowRecallEnablement = 0',
+    '빌드에 따라 무시될 수 있으나 보수적 차단으로 무방'
+))) {
     Write-Log 'Applying Recall-related privacy tweaks'
 
     Set-RegDword 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsAI' 'DisableAIDataAnalysis' 1
@@ -920,7 +1051,15 @@ if ($EnableRecallTweaks) {
 # -----------------------------
 # Consumer / Ads / Suggestions Tweaks
 # -----------------------------
-if ($EnableConsumerTweaks) {
+if ($EnableConsumerTweaks -and (Confirm-Step -Title '[+] 소비자 경험/광고/추천 앱 비활성화 (레지스트리)' -Details @(
+    'DisableWindowsConsumerFeatures = 1',
+    'DisableConsumerAccountStateContent = 1',
+    'DisableCloudOptimizedContent = 1',
+    'DisableTailoredExperiencesWithDiagnosticData = 1',
+    'DisableThirdPartySuggestions = 1',
+    'ContentDeliveryManager 구독 콘텐츠 항목 비활성화',
+    'SoftLandingEnabled = 0'
+))) {
     Write-Log 'Applying consumer experience and suggestions tweaks'
 
     Set-RegDword 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent' 'DisableWindowsConsumerFeatures' 1
@@ -940,7 +1079,14 @@ if ($EnableConsumerTweaks) {
 # -----------------------------
 # Privacy Tweaks
 # -----------------------------
-if ($EnablePrivacyTweaks) {
+if ($EnablePrivacyTweaks -and (Confirm-Step -Title '[+] 개인정보/텔레메트리 정책 적용 (레지스트리)' -Details @(
+    'AllowTelemetry = 0 (텔레메트리 최소화)',
+    'DoNotShowFeedbackNotifications = 1',
+    'AdvertisingInfo DisabledByGroupPolicy = 1 (광고 ID 비활성화)',
+    'EnableActivityFeed = 0',
+    'PublishUserActivities = 0',
+    'UploadUserActivities = 0'
+))) {
     Write-Log 'Applying privacy tweaks'
 
     Set-RegDword 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection' 'AllowTelemetry' 0
@@ -955,7 +1101,10 @@ if ($EnablePrivacyTweaks) {
 # -----------------------------
 # Delivery Optimization Tweaks
 # -----------------------------
-if ($EnableDeliveryOptimizationTweaks) {
+if ($EnableDeliveryOptimizationTweaks -and (Confirm-Step -Title '[+] Delivery Optimization 외부 공유 차단 (레지스트리)' -Details @(
+    'DODownloadMode = 0 (PC 간 업데이트 공유 차단)',
+    'HKLM Config 및 Policies 두 경로 모두 적용'
+))) {
     Write-Log 'Applying Delivery Optimization tweaks'
 
     Set-RegDword 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\DeliveryOptimization\Config' 'DODownloadMode' 0
@@ -966,7 +1115,10 @@ if ($EnableDeliveryOptimizationTweaks) {
 # -----------------------------
 # Explorer / UI Tweaks
 # -----------------------------
-if ($EnableExplorerTweaks) {
+if ($EnableExplorerTweaks -and (Confirm-Step -Title '[+] 파일 탐색기 UI 조정 (레지스트리)' -Details @(
+    'ShowSyncProviderNotifications = 0 (OneDrive 등 동기화 알림 제거)',
+    'LaunchTo = 1 (탐색기 기본 시작 위치를 내 PC로 변경)'
+))) {
     Write-Log 'Applying Explorer/UI tweaks'
 
     Set-RegDword 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced' 'ShowSyncProviderNotifications' 0
@@ -978,7 +1130,13 @@ if ($EnableExplorerTweaks) {
 # -----------------------------
 # Explorer Privacy Cleanup
 # -----------------------------
-if ($EnableExplorerPrivacyCleanup) {
+if ($EnableExplorerPrivacyCleanup -and (Confirm-Step -Title '[+] 파일 탐색기 사용 흔적 정리 (레지스트리 + 파일)' -Details @(
+    'ShowRecent = 0, ShowFrequent = 0, ShowCloudFilesInQuickAccess = 0',
+    'Start_TrackDocs = 0 (최근 문서 추적 중지)',
+    'RecentDocs, RunMRU, TypedPaths, WordWheelQuery 레지스트리 키 삭제',
+    'AppData\Roaming\Microsoft\Windows\Recent 내용 삭제',
+    'AutomaticDestinations, CustomDestinations 삭제'
+))) {
     Write-Log 'Applying Explorer privacy cleanup'
 
     Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer' 'ShowRecent' 0
@@ -1000,7 +1158,11 @@ if ($EnableExplorerPrivacyCleanup) {
 # -----------------------------
 # Start Menu Tweaks
 # -----------------------------
-if ($EnableStartMenuTweaks) {
+if ($EnableStartMenuTweaks -and (Confirm-Step -Title '[+] 시작 메뉴 추천/최근 항목 표시 제한 (레지스트리)' -Details @(
+    'ShowRecentList = 0, ShowFrequentList = 0, ShowRecommendations = 0',
+    'Start_TrackDocs = 0, Start_TrackProgs = 0',
+    'ContentDeliveryManager 구독 콘텐츠 338388, 338389 비활성화'
+))) {
     Write-Log 'Applying Start menu recommendation tweaks'
 
     Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Start' 'ShowRecentList' 0
@@ -1016,7 +1178,13 @@ if ($EnableStartMenuTweaks) {
 # -----------------------------
 # Taskbar / Notification Tweaks
 # -----------------------------
-if ($EnableTaskbarAndNotificationTweaks) {
+if ($EnableTaskbarAndNotificationTweaks -and (Confirm-Step -Title '[+] 작업표시줄/알림 정리 (레지스트리)' -Details @(
+    'ShowTaskViewButton = 0 (작업 보기 버튼 숨김)',
+    'TaskbarDa = 0 (Widgets 숨김)',
+    'AllowNewsAndInterests = 0',
+    'ContentDeliveryManager 310093, 338393, 353694, 353696 비활성화',
+    'ScoobeSystemSettingEnabled = 0 (Windows 환영 경험 비활성화)'
+))) {
     Write-Log 'Applying taskbar and notification tweaks'
 
     Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' 'ShowTaskViewButton' 0
@@ -1033,7 +1201,14 @@ if ($EnableTaskbarAndNotificationTweaks) {
 # -----------------------------
 # Lock Screen Content Tweaks
 # -----------------------------
-if ($EnableLockScreenContentTweaks) {
+if ($EnableLockScreenContentTweaks -and (Confirm-Step -Title '[+] 잠금화면 콘텐츠 제한 (레지스트리)' -Details @(
+    'RotatingLockScreenEnabled = 0 (Spotlight 비활성화)',
+    'RotatingLockScreenOverlayEnabled = 0',
+    'SubscribedContent-338387Enabled = 0',
+    'LockScreenOverlayEnabled = 0',
+    'SoftLandingEnabled = 0',
+    'SlideshowEnabled = 0 (잠금화면 슬라이드쇼 비활성화)'
+))) {
     Write-Log 'Applying lock screen content tweaks'
 
     Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager' 'RotatingLockScreenEnabled' 0
@@ -1048,7 +1223,12 @@ if ($EnableLockScreenContentTweaks) {
 # -----------------------------
 # Optional Windows Feature Disable
 # -----------------------------
-if ($EnableOptionalFeatureDisable) {
+if ($EnableOptionalFeatureDisable -and (Confirm-Step -Title '[+] Windows 선택적 기능 비활성화' -Details @(
+    'Printing-XPSServices-Features (XPS 문서 작성기)',
+    'WorkFolders-Client (회사 폴더 클라이언트)',
+    'SMB1Protocol (레거시 파일 공유 프로토콜, 보안 취약)',
+    '경고: 환경에 따라 필요한 기능이 있을 수 있으니 확인 후 진행하십시오'
+))) {
     Write-Log 'Disabling selected optional features' 'WARN'
 
     $Features = @(
@@ -1072,7 +1252,10 @@ if ($EnableOptionalFeatureDisable) {
 # -----------------------------
 # CleanMgr
 # -----------------------------
-if ($EnableCleanMgr) {
+if ($EnableCleanMgr -and (Confirm-Step -Title '[+] Windows 디스크 정리 (cleanmgr)' -Details @(
+    'cleanmgr.exe /verylowdisk 실행 (완료까지 대기)',
+    '시스템 기본 디스크 정리 항목 자동 처리'
+))) {
     Write-Log 'Running cleanmgr'
     try {
         Start-Process cleanmgr.exe '/verylowdisk' -Wait -NoNewWindow
@@ -1084,7 +1267,14 @@ if ($EnableCleanMgr) {
 # -----------------------------
 # DISM Cleanup
 # -----------------------------
-if ($EnableDismCleanup) {
+$dismDetails = @('dism /online /cleanup-image /startcomponentcleanup 실행')
+if ($EnableResetBase) {
+    $dismDetails += '/resetbase 포함 (WinSxS 최대 정리, 롤백 불가)'
+} else {
+    $dismDetails += '/resetbase 미포함 (롤백 가능성 유지)'
+}
+
+if ($EnableDismCleanup -and (Confirm-Step -Title '[+] DISM 컴포넌트 저장소 정리' -Details $dismDetails)) {
     Write-Log 'Running DISM cleanup'
     try {
         $dismArgs = '/online /cleanup-image /startcomponentcleanup'
@@ -1101,7 +1291,12 @@ if ($EnableDismCleanup) {
 # -----------------------------
 # CompactOS (optional)
 # -----------------------------
-if ($EnableCompactOS) {
+if ($EnableCompactOS -and (Confirm-Step -Title '[+] CompactOS 적용' -Details @(
+    'compact.exe /compactos:always 실행',
+    'OS 파일을 XPRESS4K 압축으로 저장 (수 GB 절감 가능)',
+    '경고: CPU 오버헤드 증가 및 업데이트/관리 복잡도 상승 가능',
+    '경고: 복제 VM에서 검증 후 반영 권장'
+))) {
     Write-Log 'Applying CompactOS' 'WARN'
     try {
         Start-Process compact.exe '/compactos:always' -Wait -NoNewWindow
@@ -1109,6 +1304,73 @@ if ($EnableCompactOS) {
     catch {}
 }
 # CompactOS는 OS 파일 압축을 시도합니다.
+
+# -----------------------------
+# Edge Tweaks
+# -----------------------------
+if ($EnableEdgeTweaks -and (Confirm-Step -Title '[+] Microsoft Edge 최적화 (VDOT 기준 정책 레지스트리)' -Details @(
+    'BackgroundModeEnabled = 0 (OS 로그인 시 백그라운드 프로세스 자동 시작 비활성화)',
+    'StartupBoostEnabled = 0 (시작 부스트/사전 로드 비활성화)',
+    'HideFirstRunExperience = 1 (최초 실행 스플래시 화면 숨김)',
+    'ShowRecommendationsEnabled = 0 (제품 내 추천/알림 비활성화)',
+    'WebWidgetAllowed = 0 (바탕화면 Edge 검색 위젯 비활성화)',
+    'EfficiencyMode = 0 (비활성 탭 슬립 효율성 모드 비활성화)',
+    'AllowPrelaunch = 0 / AllowTabPreloading = 0 (레거시 Edge 사전 로드 차단)',
+    'MicrosoftEdgeDataOptIn = 0 (Edge 데이터 수집 옵트인 비활성화)',
+    'AllowEdgeSwipe = 0 (EdgeUI 스와이프 제스처 비활성화)',
+    'UpdatesSuppressed: 04:00 ~ 15시간 (VDI 업무 시간대 Edge 자동 업데이트 억제)',
+    'AutofillAddressEnabled = 0 (주소 자동완성 비활성화)',
+    'AutofillCreditCardEnabled = 0 (신용카드/결제 정보 자동완성 비활성화)',
+    'PasswordManagerEnabled = 0 (비밀번호 저장 및 자동완성 비활성화)',
+    'NewTabPagePrerenderEnabled = 0 (새 탭 페이지 사전 렌더링 비활성화)',
+    'NetworkPredictionOptions = 2 (DNS 프리페치 및 TCP 사전 연결 비활성화)',
+    'HardwareAccelerationModeEnabled = 1 (하드웨어 가속 명시적 활성화 유지)',
+    '주의: HKCU 항목은 현재 사용자 프로필에만 적용됩니다 (Sysprep 후 신규 사용자 미적용)'
+))) {
+    Write-Log 'Applying Edge optimization policies (VDOT baseline)'
+
+    # Edge Chromium 정책 (HKLM) ─ 모든 사용자에게 적용
+    $edgePolicy = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'
+    Set-RegDword $edgePolicy 'BackgroundModeEnabled'                              0
+    Set-RegDword $edgePolicy 'StartupBoostEnabled'                                0
+    Set-RegDword $edgePolicy 'HideFirstRunExperience'                             1
+    Set-RegDword $edgePolicy 'HideInternetExplorerRedirectUXForIncompatibleSitesEnabled' 1
+    Set-RegDword $edgePolicy 'ShowRecommendationsEnabled'                         0
+    Set-RegDword $edgePolicy 'EfficiencyMode'                                     0
+    Set-RegDword $edgePolicy 'WebWidgetAllowed'                                   0
+    Set-RegDword $edgePolicy 'AutofillAddressEnabled'                             0
+    Set-RegDword $edgePolicy 'AutofillCreditCardEnabled'                          0
+    Set-RegDword $edgePolicy 'PasswordManagerEnabled'                             0
+    Set-RegDword $edgePolicy 'NewTabPagePrerenderEnabled'                         0
+    Set-RegDword $edgePolicy 'NetworkPredictionOptions'                           2
+    Set-RegDword $edgePolicy 'HardwareAccelerationModeEnabled'                    1
+
+    # 레거시 Edge (EdgeHTML) 정책 (HKLM)
+    Set-RegDword 'HKLM:\SOFTWARE\Policies\Microsoft\MicrosoftEdge\Main'         'AllowPrelaunch'               0
+    Set-RegDword 'HKLM:\SOFTWARE\Policies\Microsoft\MicrosoftEdge\Main'         'PreventFirstRunPage'          1
+    Set-RegDword 'HKLM:\SOFTWARE\Policies\Microsoft\MicrosoftEdge\TabPreloader' 'AllowTabPreloading'           0
+    Set-RegDword 'HKLM:\SOFTWARE\Policies\Microsoft\MicrosoftEdge\ServiceUI'    'AllowWebContentOnNewTabPage'  0
+    Set-RegDword 'HKLM:\SOFTWARE\Policies\Microsoft\MicrosoftEdge\BooksLibrary' 'AllowConfigurationUpdateForBooksLibrary' 0
+    Set-RegDword 'HKLM:\SOFTWARE\Policies\Microsoft\MicrosoftEdge\BooksLibrary' 'EnableExtendedBooksTelemetry' 0
+
+    # Edge 데이터 수집 옵트인 비활성화 (HKLM)
+    Set-RegDword 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection' 'MicrosoftEdgeDataOptIn' 0
+
+    # Windows EdgeUI 제스처/추적 (HKLM)
+    Set-RegDword 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\EdgeUI' 'AllowEdgeSwipe'    0
+    Set-RegDword 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\EdgeUI' 'DisableHelpSticker' 1
+
+    # Windows EdgeUI MFU 추적 비활성화 (HKCU ─ 현재 사용자)
+    Set-RegDword 'HKCU:\SOFTWARE\Policies\Microsoft\Windows\EdgeUI' 'DisableMFUTracking' 1
+
+    # Edge 자동 업데이트 억제: 04:00 시작, 900분(15시간) 억제 (HKCU ─ 현재 사용자)
+    $edgeUpdate = 'HKCU:\SOFTWARE\Policies\Microsoft\EdgeUpdate'
+    Set-RegDword $edgeUpdate 'UpdatesSuppressedStartHour'    4
+    Set-RegDword $edgeUpdate 'UpdatesSuppressedStartMin'     0
+    Set-RegDword $edgeUpdate 'UpdatesSuppressedDurationMin'  900
+}
+# VDOT(Virtual Desktop Optimization Tool) 기준 Edge 정책 항목을 적용합니다.
+# HKCU 항목은 현재 감사 모드 계정에만 적용되며 Sysprep 후 신규 사용자에게는 별도 적용이 필요합니다.
 
 # -----------------------------
 # Restart stopped services
