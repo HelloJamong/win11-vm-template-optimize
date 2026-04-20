@@ -12,7 +12,6 @@
 *.zip
 *.pck
 *.vhd
-*.vhdx
 *.iso
 
 # macOS/Windows 탐색기 메타데이터

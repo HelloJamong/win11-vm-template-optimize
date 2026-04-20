@@ -223,6 +223,11 @@ $EnableResetBase                   = $true
 # DISM /StartComponentCleanup 실행 시 /ResetBase를 함께 사용합니다.
 # 용량 절감 효과가 크지만 기존 업데이트 롤백 가능성이 줄어듭니다.
 
+$EnableDefragFreeSpace             = $false
+# defrag /X 로 여유 공간을 통합합니다. VHD compact 전 압축률 향상에 유효합니다.
+# 소요 시간이 길고 SSD/NVMe 기반 VM에서는 불필요하므로 기본 false입니다.
+
+
 # -----------------------------
 # Logging
 # -----------------------------
@@ -504,6 +509,7 @@ function Apply-ModePreset {
             EnableCompactOS                  = $false
             EnableSetupLogCleanup            = $false
             EnableResetBase                  = $false
+            EnableDefragFreeSpace            = $false
         }
         standard = @{
             EnableTempCleanup                = $true
@@ -537,6 +543,7 @@ function Apply-ModePreset {
             EnableCompactOS                  = $false
             EnableSetupLogCleanup            = $false
             EnableResetBase                  = $true
+            EnableDefragFreeSpace            = $false
         }
         advanced = @{
             EnableTempCleanup                = $true
@@ -570,6 +577,7 @@ function Apply-ModePreset {
             EnableCompactOS                  = $true
             EnableSetupLogCleanup            = $true
             EnableResetBase                  = $true
+            EnableDefragFreeSpace            = $false
         }
     }
 
@@ -1380,6 +1388,26 @@ if ($EnableUpdateCacheCleanup -or $EnableTempCleanup) {
 }
 # 처음에 중지했던 Update/BITS/DO 서비스를 다시 시작합니다.
 
+# -----------------------------
+# Defrag Free Space
+# -----------------------------
+if ($EnableDefragFreeSpace -and (Confirm-Step -Title '[+] 여유 공간 통합 (defrag /X)' -Details @(
+    "defrag $env:SystemDrive /X /U /V",
+    'VHD compact 전 여유 공간을 연속된 영역으로 모읍니다.',
+    '경고: 소요 시간이 길 수 있습니다. SSD/NVMe 기반 VM에서는 생략을 권장합니다.'
+))) {
+    Write-Log "Defragmenting free space: $env:SystemDrive"
+    try {
+        Start-Process defrag.exe "$env:SystemDrive /X /U /V" -Wait -NoNewWindow
+    }
+    catch {
+        Write-Log 'defrag 실행 실패' 'WARN'
+    }
+}
+# VHD compact 전 여유 공간을 연속 배치해 압축률을 높입니다.
+# SSD 기반 VM이나 thin-provisioned 디스크에서는 생략해도 무방합니다.
+
+
 Write-Log '=== Optimization Complete ===' 'SUCCESS'
 Write-Host ''
 Write-Host '완료되었습니다.'
@@ -1387,4 +1415,4 @@ Write-Host '권장 후속 작업:'
 Write-Host '1) 별도 검증 문서와 docs/guide.md 기준 결과 점검'
 Write-Host '2) Sysprep 실행'
 Write-Host '3) 종료'
-Write-Host '4) 이후 zero-fill / VHD compact / 보관은 조직 표준 후처리 절차로 수행'
+Write-Host '4) 이후 VHD compact / 보관은 조직 표준 후처리 절차로 수행'

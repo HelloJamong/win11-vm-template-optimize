@@ -6,6 +6,38 @@
 - `메이저버전`: 프로젝트 기준선 또는 운영 방식이 크게 바뀌는 변경입니다.
 - `마이너버전`: 동일 메이저 기준선 안에서 누적되는 기능/문서/검증 개선 변경입니다.
 
+## [26.1.8] - 2026-04-20
+
+### Added
+
+- `$EnableDefragFreeSpace` 옵션을 추가했습니다.
+  - `defrag /X`로 여유 공간을 통합합니다. VHD compact 전 압축률 향상에 유효합니다.
+  - 소요 시간이 길고 SSD/NVMe 기반 VM에서는 불필요하므로 기본값은 `$false`입니다.
+  - lite / standard / advanced 세 모드 모두 `$false`로 등록했습니다.
+
+### Changed
+
+- README.md 6.9 VHD 후처리 섹션을 3단계 후처리 절차로 재작성했습니다.
+  - SDelete(Microsoft Sysinternals) 공식 다운로드 주소 추가
+  - `sdelete64.exe -z C:` 사용법, 주의사항(즉시 종료, 망분리 반입), 소요 시간 안내 추가
+  - VHD compact → 보관 순서로 단계 정리
+- 전체 문서 및 스크립트에서 `VHDX` 표기를 제거하고 `VHD`로 통일했습니다.
+  - `README.md` 내 `VHD/VHDX` 2곳 → `VHD`
+  - `scripts/win11_master_template_optimize.ps1` 주석 1곳 → `VHD`
+  - `.gitignore`에서 `*.vhdx` 항목 제거
+
+### Removed
+
+- `$EnableZeroFreeSpace` 옵션(`cipher /w` 기반 zero-fill)을 제거했습니다.
+  - zero-fill은 스크립트 자동화 대신 SDelete를 사용한 수동 후처리로 안내합니다.
+  - README.md 6.9 후처리 가이드에 SDelete 사용법과 다운로드 주소로 대체했습니다.
+
+### Verification
+
+- 스크립트 내 `EnableZeroFreeSpace` 참조 전체 제거 확인
+- `VHDX` 표기 전체 제거 확인 (`.gitignore`, `README.md`, `scripts/`)
+- README.md 6.9 섹션 sdelete 가이드 및 다운로드 URL 반영 확인
+
 ## [26.1.7] - 2026-04-18
 
 ### Added
