@@ -6,6 +6,37 @@
 - `메이저버전`: 프로젝트 기준선 또는 운영 방식이 크게 바뀌는 변경입니다.
 - `마이너버전`: 동일 메이저 기준선 안에서 누적되는 기능/문서/검증 개선 변경입니다.
 
+## [26.1.9] - 2026-04-20
+
+### Added
+
+- `scripts/build-vm-optimize-iso.ps1` 추가
+  - `scripts/_iso/` 폴더의 파일 전체를 `VM_optimize.iso`로 생성합니다.
+  - 실행 시 `_iso` 폴더 안내 메시지 출력 후 Y/n 확인 절차를 거칩니다.
+  - Y 입력 후 `_iso` 폴더가 없거나 비어 있으면 오류 메시지를 출력하고 종료합니다.
+  - IMAPI2 COM API 사용, UTF-8 콘솔 인코딩 설정 포함.
+- `scripts/_iso/` 스테이징 디렉터리 추가
+  - `win11_master_template_optimize.ps1`, `sdelete64.exe` 등 VM에 전달할 파일을 배치하는 폴더입니다.
+  - `.gitignore`에 `_iso/*` 추가 (내용물 추적 제외, `.gitkeep`으로 구조만 유지).
+- `.github/workflows/release.yml` 추가
+  - 태그 푸시(`YY.MAJOR.MINOR`) 또는 `workflow_dispatch`로 트리거됩니다.
+  - `CHANGELOG.md`에서 해당 버전 릴리즈 노트를 자동 추출합니다.
+  - `VM-Optimize.zip` 생성 — 스크립트 4개 + `_iso/` 폴더 + `Version.txt` 포함.
+  - `Version.txt`에 버전 번호와 해당 버전 릴리즈 노트를 기록합니다.
+- `README.md` 6.6 섹션에 실행 정책(Execution Policy) 상세 안내 추가
+  - Process/CurrentUser 범위별 설정 방법, `Unblock-File` 안내 추가.
+
+### Changed
+
+- `scripts/sysprep/build-unattend-iso.ps1` 인코딩 수정
+  - 콘솔 출력 UTF-8 고정 (한글 깨짐 방지).
+  - ISO 내 `README.txt` 인코딩을 `UTF8` → `Unicode`(UTF-16 LE BOM)로 변경해 Windows에서 한글이 정상 표시되도록 수정.
+
+### Verification
+
+- 워크플로 `_release/_iso/` 경로 포함 및 ZIP 구조 확인
+- `build-vm-optimize-iso.ps1` Y/n 분기 및 오류 메시지 경로 확인
+
 ## [26.1.8] - 2026-04-20
 
 ### Added

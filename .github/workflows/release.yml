@@ -51,17 +51,17 @@ jobs:
       - name: Create release ZIP
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          # Version.txt 생성 — 버전 정보 + 릴리즈 노트
+          mkdir -p _release/_iso
+          cp scripts/win11_master_template_optimize.ps1 _release/
+          cp scripts/build-vm-optimize-iso.ps1          _release/
+          cp scripts/sysprep/build-unattend-iso.ps1     _release/
+          cp scripts/sysprep/unattend.xml               _release/
           {
             echo "Version: ${VERSION}"
             echo ""
             echo "${{ steps.changelog.outputs.notes }}"
-          } > Version.txt
-          zip "VM-Optimize.zip" -j \
-            scripts/win11_master_template_optimize.ps1 \
-            scripts/sysprep/build-unattend-iso.ps1 \
-            scripts/sysprep/unattend.xml \
-            Version.txt
+          } > _release/Version.txt
+          cd _release && zip -r ../VM-Optimize.zip .
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
