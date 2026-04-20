@@ -140,6 +140,43 @@ C:\Windows\System32\Sysprep\unattend.xml
 
 ### 6.6 최적화 스크립트 실행
 
+#### 실행 정책(Execution Policy) 설정
+
+Windows PowerShell은 기본적으로 스크립트 실행을 제한합니다. 실행 전 다음 오류가 발생하면 실행 정책 설정이 필요합니다.
+
+```text
+이 시스템에서 스크립트를 실행할 수 없으므로 파일을 로드할 수 없습니다.
+```
+
+**권장 방법 — 현재 세션에만 임시 적용 (Scope: Process)**
+
+가장 안전한 방법입니다. PowerShell 창을 닫으면 자동으로 원복됩니다.
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
+```
+
+**대안 — 현재 사용자에게 영구 적용 (Scope: CurrentUser)**
+
+세션이 닫혀도 설정이 유지됩니다. 작업 후 원복을 권장합니다.
+
+```powershell
+# 적용
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+# 작업 완료 후 원복
+Set-ExecutionPolicy -ExecutionPolicy Restricted -Scope CurrentUser -Force
+```
+
+**인터넷에서 내려받은 스크립트인 경우**
+
+파일에 Zone.Identifier(인터넷 다운로드 표시)가 붙어 있으면 별도로 차단 해제가 필요합니다.
+
+```powershell
+Unblock-File -Path .\scripts\win11_master_template_optimize.ps1
+```
+
+#### 스크립트 실행
+
 Audit Mode의 관리자 PowerShell에서 다음과 같이 실행합니다.
 
 ```powershell

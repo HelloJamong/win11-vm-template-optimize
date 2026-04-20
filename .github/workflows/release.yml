@@ -1,0 +1,67 @@
+name: Release
+
+# 태그 푸시(예: git tag 26.1.8 && git push origin 26.1.8) 또는 수동 실행으로 트리거됩니다.
+on:
+  push:
+    tags:
+      - '[0-9][0-9].[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '릴리즈 버전 (예: 26.1.8) — 해당 태그가 저장소에 이미 존재해야 합니다'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Extract release notes from CHANGELOG.md
+        id: changelog
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          NOTES=$(awk "/^## \[${VERSION}\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md)
+          if [ -z "$(echo "$NOTES" | tr -d '[:space:]')" ]; then
+            echo "::warning::CHANGELOG.md에서 버전 [${VERSION}] 항목을 찾을 수 없습니다."
+            NOTES="릴리즈 노트를 찾을 수 없습니다. CHANGELOG.md의 [${VERSION}] 항목을 확인하십시오."
+          fi
+          {
+            echo "notes<<CHANGELOG_EOF"
+            printf '%s' "$NOTES"
+            echo ""
+            echo "CHANGELOG_EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Create release ZIP
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          ZIP_NAME="win11-vm-template-optimize-${VERSION}.zip"
+          zip "$ZIP_NAME" -j \
+            scripts/win11_master_template_optimize.ps1 \
+            scripts/sysprep/build-unattend-iso.ps1 \
+            scripts/sysprep/unattend.xml
+          echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: ${{ steps.version.outputs.version }}
+          body: ${{ steps.changelog.outputs.notes }}
+          files: ${{ env.ZIP_NAME }}

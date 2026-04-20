@@ -47,6 +47,10 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+[Console]::InputEncoding  = [System.Text.Encoding]::UTF8
+$OutputEncoding           = [System.Text.Encoding]::UTF8
+
 function Write-Info {
     param([string]$Message)
     Write-Host "[INFO] $Message"
@@ -157,7 +161,7 @@ try {
     Set-Content -LiteralPath $generatedXmlPath -Value $generatedContent -Encoding UTF8
 
     $readmePath = Join-Path $tempRoot 'README.txt'
-    Set-Content -LiteralPath $readmePath -Encoding UTF8 -Value @"
+    Set-Content -LiteralPath $readmePath -Encoding Unicode -Value @"
 Windows 11 VM Sysprep unattend ISO
 
 - unattend.xml ProfilesDirectory: ${driveLetter}:\Users
