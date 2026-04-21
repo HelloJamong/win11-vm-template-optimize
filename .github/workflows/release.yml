@@ -36,17 +36,26 @@ jobs:
         id: changelog
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          NOTES=$(awk "/^## \[${VERSION}\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md)
-          if [ -z "$(echo "$NOTES" | tr -d '[:space:]')" ]; then
+
+          # 릴리즈 노트를 셸 변수에 저장하지 않고 파일에 직접 씁니다.
+          # 변수 확장 시 CHANGELOG 내 마크다운 백틱이 bash 명령으로 해석되는 문제를 방지합니다.
+          NOTES_FILE="$(mktemp)"
+          awk "/^## \[${VERSION}\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md > "${NOTES_FILE}"
+
+          if [ ! -s "${NOTES_FILE}" ]; then
             echo "::warning::CHANGELOG.md에서 버전 [${VERSION}] 항목을 찾을 수 없습니다."
-            NOTES="릴리즈 노트를 찾을 수 없습니다. CHANGELOG.md의 [${VERSION}] 항목을 확인하십시오."
+            printf 'CHANGELOG.md의 [%s] 항목을 찾을 수 없습니다.\n' "${VERSION}" > "${NOTES_FILE}"
           fi
+
+          # 파일 경로를 output으로 전달합니다 (이후 단계에서 cat으로 읽어 bash 해석을 우회).
+          echo "notes_file=${NOTES_FILE}" >> "$GITHUB_OUTPUT"
+
+          # GitHub Release body용 멀티라인 output (Actions 표현식 레벨에서 처리됨).
           {
-            echo "notes<<CHANGELOG_EOF"
-            printf '%s' "$NOTES"
-            echo ""
-            echo "CHANGELOG_EOF"
-          } >> $GITHUB_OUTPUT
+            printf 'notes<<CHANGELOG_EOF\n'
+            cat "${NOTES_FILE}"
+            printf '\nCHANGELOG_EOF\n'
+          } >> "$GITHUB_OUTPUT"
 
       - name: Create release ZIP
         run: |
@@ -70,10 +79,10 @@ jobs:
           # 통합 가이드
           cp docs/guide.md                              _release/docs/
 
+          # Version.txt: cat으로 파일을 읽어 bash 백틱 해석을 우회합니다.
           {
-            echo "Version: ${VERSION}"
-            echo ""
-            echo "${{ steps.changelog.outputs.notes }}"
+            printf 'Version: %s\n\n' "${VERSION}"
+            cat "${{ steps.changelog.outputs.notes_file }}"
           } > _release/Version.txt
           cd _release && zip -r ../VM-Optimize.zip .
 
@@ -82,5 +91,5 @@ jobs:
         with:
           tag_name: ${{ steps.version.outputs.version }}
           name: ${{ steps.version.outputs.version }}
-          body: ${{ steps.changelog.outputs.notes }}
+          body-path: ${{ steps.changelog.outputs.notes_file }}
           files: VM-Optimize.zip
