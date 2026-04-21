@@ -91,5 +91,5 @@ jobs:
         with:
           tag_name: ${{ steps.version.outputs.version }}
           name: ${{ steps.version.outputs.version }}
-          body-path: ${{ steps.changelog.outputs.notes_file }}
+          body: ${{ steps.changelog.outputs.notes }}
           files: VM-Optimize.zip
