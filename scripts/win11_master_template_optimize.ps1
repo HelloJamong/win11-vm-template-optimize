@@ -1,4 +1,4 @@
-#requires -RunAsAdministrator
+﻿#requires -RunAsAdministrator
 # 위 선언은 "관리자 권한으로 실행되어야 함"을 의미합니다.
 # 제거하면 일반 권한 실행 시 일부 정리/정책/서비스 변경이 실패할 수 있습니다.
 

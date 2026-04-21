@@ -73,10 +73,12 @@ win11-vm-template-optimize/
 ├─ docs/
 │  └─ guide.md
 ├─ scripts/
-│  ├─ win11_master_template_optimize.ps1
+│  ├─ win11_master_template_optimize.ps1   ← Audit Mode 최적화 (단일 스크립트)
 │  └─ sysprep/
-│     ├─ unattend.xml
-│     └─ build-unattend-iso.ps1
+│     ├─ unattend.xml                      ← Sysprep 응답 파일 (CopyProfile=true)
+│     ├─ first_logon.ps1                   ← 최초 로그인 자동화 (D:\UserData 리디렉션)
+│     ├─ setupcomplete.cmd                 ← Setup 완료 후 사전 준비 훅
+│     └─ build-unattend-iso.ps1            ← vmsetup.iso 생성 도구
 ├─ configs/
 │  ├─ appx-remove-list.txt
 │  ├─ services-disable-list.txt
@@ -86,7 +88,8 @@ win11-vm-template-optimize/
 
 - `CHANGELOG.md`: 연도.메이저버전.마이너버전 형식의 공식 변경 이력
 - `docs/guide.md`: 템플릿 생성, 정리 항목, Sysprep, 감사 대응을 통합한 운영 가이드
-- `scripts/`: Audit Mode에서 실행할 단일 PowerShell 스크립트와 Sysprep 응답 파일/ISO 생성 스크립트
+- `scripts/win11_master_template_optimize.ps1`: Audit Mode에서 실행하는 단일 최적화 스크립트
+- `scripts/sysprep/`: Sysprep 응답 파일, 최초 로그인 스크립트, ISO 생성 도구 모음
 - `configs/`: 제거/비활성화 후보 목록 및 정책 레지스트리 설명
 
 ## 6. 사용 흐름
@@ -112,31 +115,68 @@ Ctrl + Shift + F3
 
 시스템이 재부팅되며 기본 Administrator 계정으로 Audit Mode에 진입합니다. Sysprep 창이 자동으로 열릴 수 있으나, 작업이 끝나기 전까지 닫거나 최소화합니다.
 
-### 6.4 별도 사용자 프로필 드라이브 구성
+### 6.4 D 드라이브(UserData) 구성
 
-1. 디스크 관리 또는 `diskpart`로 OS 드라이브와 분리된 사용자 프로필용 파티션/디스크를 준비합니다.
-2. 설치 ISO 또는 게스트 도구 ISO가 사용할 드라이브 문자를 점유하고 있다면 조직 표준에 맞게 다른 문자로 변경합니다.
-3. 사용자 프로필용 파티션에 조직 표준 드라이브 문자를 할당합니다.
-4. 필요 시 볼륨 레이블을 조직 표준 이름으로 지정합니다.
-5. 별도 사용자 프로필 드라이브 아래에 사용자 프로필 루트 폴더를 미리 생성합니다.
+이전 방식(ProfilesDirectory로 C:\Users 전체를 D로 이동)은 VirtualBox 스냅샷 구조, Sysprep, Store 앱과 충돌하므로 사용하지 않습니다.
 
-예시:
+**현재 아키텍처:**
+
+| 항목 | 경로 | 드라이브 용도 |
+|------|------|--------------|
+| 사용자 프로필 | `C:\Users\{사용자명}` | C (스냅샷 대상) |
+| 사용자 데이터 | `D:\UserData\{사용자명}` | D (Writethrough, 스냅샷 제외) |
+
+- `C:\Users`는 절대 이동하지 않습니다. Sysprep, AppData, 프로필 레지스트리가 이 경로에 의존합니다.
+- Desktop, Documents, Downloads 등 실제 데이터 폴더만 D 드라이브로 리디렉션합니다.
+- 리디렉션은 `first_logon.ps1`이 최초 로그인 시 자동 처리합니다.
+
+**Audit Mode에서 D 드라이브 준비:**
 
 ```powershell
-New-Item -ItemType Directory -Path '<ProfileDrive>:\Users' -Force
+# D 드라이브가 없으면 diskpart 또는 디스크 관리에서 먼저 파티션을 생성합니다.
+# first_logon.ps1이 D:\UserData\{사용자명} 하위 폴더를 자동 생성하므로
+# Audit Mode 단계에서는 D 드라이브 자체만 준비하면 됩니다.
 ```
 
-### 6.5 unattend.xml 적용
+### 6.5 Sysprep 파일 배치 (ISO 사용)
 
-샘플 응답 파일은 `scripts/sysprep/unattend.xml`에 있습니다. 이 파일은 `ProfilesDirectory`를 별도 사용자 프로필 드라이브의 사용자 폴더로 지정하는 템플릿입니다. 실제 적용 전 `<ProfileDrive>`를 조직 표준 드라이브 문자로 치환하십시오. VM에 ISO로 전달해야 하는 경우 `scripts/sysprep/build-unattend-iso.ps1`로 치환 완료된 `unattend.xml` ISO를 생성할 수 있습니다.
+`scripts/sysprep/build-unattend-iso.ps1`로 `vmsetup.iso`를 생성합니다. 이 ISO에는 `unattend.xml`, `first_logon.ps1`, `SetupComplete.cmd`가 포함됩니다.
 
-권장 배치 위치 예시는 다음과 같습니다.
+```powershell
+# 호스트 또는 Audit Mode PowerShell에서 실행
+.\scripts\sysprep\build-unattend-iso.ps1
+# 출력: scripts/sysprep/vmsetup.iso
+```
+
+ISO를 VM에 마운트한 뒤 Audit Mode 관리자 PowerShell에서 배치합니다.
+
+```powershell
+$iso = (Get-Volume | Where-Object { $_.FileSystemLabel -eq 'VMSETUP' }).DriveLetter + ':'
+Copy-Item "$iso\unattend.xml" 'C:\Windows\System32\Sysprep\unattend.xml' -Force
+Copy-Item "$iso\Scripts\*"    'C:\Windows\Setup\Scripts\'                -Force
+```
+
+또는 수동으로 파일을 직접 복사해도 됩니다.
 
 ```text
-C:\Windows\System32\Sysprep\unattend.xml
+scripts/sysprep/unattend.xml       → C:\Windows\System32\Sysprep\unattend.xml
+scripts/sysprep/first_logon.ps1    → C:\Windows\Setup\Scripts\first_logon.ps1
+scripts/sysprep/setupcomplete.cmd  → C:\Windows\Setup\Scripts\SetupComplete.cmd
 ```
 
-또는 Sysprep 실행 시 `/unattend:<경로>`로 직접 지정할 수 있습니다.
+**`first_logon.ps1` 역할:**
+
+최초 로그인 시 `unattend.xml`의 `FirstLogonCommands`에 의해 자동 실행됩니다.
+
+1. `D:\UserData\{사용자명}` 폴더 구조 생성
+2. Desktop / Documents / Downloads / Pictures / Videos / Music → D 드라이브로 리디렉션
+3. Appx 불필요 앱 제거 (Xbox, PhoneLink, Copilot, Teams, Clipchamp)
+4. Provisioned Appx 제거 (신규 사용자 자동 설치 차단)
+5. HKCU 설정 재적용 (Search, Copilot, Consumer Experience, Telemetry, Explorer)
+6. Explorer 재시작
+7. 재실행 방지 플래그 설정 (`HKCU:\Software\VMTemplateSetup\FirstLogonComplete`)
+
+로그는 `C:\Windows\Logs\first_logon.log`에 기록됩니다.
 
 ### 6.6 최적화 스크립트 실행
 

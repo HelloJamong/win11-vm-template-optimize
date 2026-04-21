@@ -52,10 +52,24 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           mkdir -p _release/_iso
+          mkdir -p _release/sysprep
+          mkdir -p _release/docs
+
+          # Audit Mode 최적화 스크립트
           cp scripts/win11_master_template_optimize.ps1 _release/
+
+          # VM_optimize ISO 생성 도구 (sdelete 등 추가 파일 번들용)
           cp scripts/build-vm-optimize-iso.ps1          _release/
-          cp scripts/sysprep/build-unattend-iso.ps1     _release/
-          cp scripts/sysprep/unattend.xml               _release/
+
+          # Sysprep 관련 파일 일체
+          cp scripts/sysprep/unattend.xml               _release/sysprep/
+          cp scripts/sysprep/first_logon.ps1            _release/sysprep/
+          cp scripts/sysprep/setupcomplete.cmd          _release/sysprep/
+          cp scripts/sysprep/build-unattend-iso.ps1     _release/sysprep/
+
+          # 통합 가이드
+          cp docs/guide.md                              _release/docs/
+
           {
             echo "Version: ${VERSION}"
             echo ""

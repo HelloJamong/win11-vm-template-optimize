@@ -1,265 +1,373 @@
 # Windows 11 VM 마스터 템플릿 통합 가이드
 
-이 문서는 Windows 11 VM 마스터 템플릿 생성, Audit Mode 작업, 별도 사용자 프로필 드라이브 구성, 최적화 스크립트 실행, Sysprep, 종료, 후처리, 감사 체크포인트를 한 곳에 정리한 통합 운영 가이드입니다.
+이 문서는 Windows 11 VM 마스터 템플릿 생성 절차를 처음부터 끝까지 설명합니다.
+Audit Mode 작업, 최적화 스크립트 실행, Sysprep, 최초 로그인 자동화, VHD 후처리까지
+모든 단계를 한 곳에 정리했습니다.
 
-## 1. 운영 원칙
+---
 
-- VM 환경과 하이퍼바이저 종류에 종속되지 않는 절차를 우선합니다.
-- 기본 자동화는 PowerShell 중심으로 유지합니다.
-- 외부 도구 실행은 기본 스크립트에 포함하지 않고 후처리 단계에서만 별도 수행합니다.
-- 공공기관/망분리 환경을 고려해 과도한 제거/비활성화는 모드 옵션으로 분리합니다.
-- 사용자 프로필 위치는 기존 프로필을 레지스트리로 강제 이동하지 않고 Sysprep `unattend.xml`에서 `ProfilesDirectory`로 지정합니다.
-- 실행한 정리, 삭제, 비활성화, 정책 변경은 `CHANGELOG.md` 또는 내부 변경 이력에 기록합니다.
+## 1. 아키텍처 개요
 
-## 2. 사전 준비
+### 드라이브 구조
+
+| 드라이브 | 용도 | VirtualBox 설정 |
+|----------|------|----------------|
+| C:\ | OS + 사용자 프로필(`C:\Users`) | 스냅샷 대상 |
+| D:\ | 사용자 데이터(`D:\UserData\{사용자명}`) | **Writethrough** (스냅샷 제외) |
+
+### 설계 원칙
+
+- `C:\Users`는 절대 이동하지 않습니다. Sysprep, AppData, 프로필 레지스트리가 이 경로에 의존합니다.
+- 사용자가 실제로 저장하는 파일(바탕화면, 문서, 다운로드 등)만 D 드라이브로 리디렉션합니다.
+- 리디렉션은 `first_logon.ps1`이 최초 로그인 시 자동으로 처리합니다.
+- `ProfilesDirectory`를 변경해 Users 폴더 전체를 이동하는 방식은 사용하지 않습니다.
+  (VirtualBox 스냅샷 구조, Sysprep, Store 앱과 충돌 발생)
+
+### 실행 흐름
+
+```
+[Audit Mode]
+  1. D 드라이브 준비 (diskpart)
+  2. VirtualBox D 드라이브 Writethrough 설정
+  3. win11_master_template_optimize.ps1 실행
+  4. sysprep 파일 배치 (unattend.xml / first_logon.ps1 / SetupComplete.cmd)
+  5. Sysprep /generalize → CopyProfile 적용 → /shutdown
+
+[OOBE]
+  6. SetupComplete.cmd 자동 실행 (SYSTEM, 로그인 전)
+
+[최초 로그인]
+  7. first_logon.ps1 자동 실행
+       ├─ D:\UserData\{사용자명} 폴더 생성
+       ├─ 쉘 폴더 리디렉션 (Desktop/Documents/Downloads 등 → D:\)
+       ├─ Appx 제거
+       ├─ HKCU 설정 재적용
+       └─ 완료 플래그 설정
+
+[VM 종료 후]
+  8. VHD 후처리 (zero-fill → compact)
+```
+
+---
+
+## 2. 배포 ZIP 파일 구조
+
+```text
+VM-Optimize.zip
+├─ win11_master_template_optimize.ps1   ← Audit Mode 최적화 스크립트
+├─ build-vm-optimize-iso.ps1            ← VM_optimize ISO 생성 도구
+├─ sysprep/
+│  ├─ unattend.xml                      ← Sysprep 응답 파일
+│  ├─ first_logon.ps1                   ← 최초 로그인 자동화 스크립트
+│  ├─ setupcomplete.cmd                 ← Setup 완료 후 사전 준비 훅
+│  └─ build-unattend-iso.ps1            ← vmsetup ISO 생성 도구
+├─ docs/
+│  └─ guide.md                          ← 이 문서
+└─ Version.txt
+```
+
+---
+
+## 3. 사전 준비
+
+### 필요 항목
 
 - Windows 11 ISO
-- VM 실행 환경
-- 조직 표준 VM 설정값
-  - vCPU
-  - Memory
-  - TPM/Secure Boot
-  - 그래픽/네트워크 설정
-  - 기본 디스크 크기
-- 이 저장소 파일 일체
-- 선택 후처리 도구
-  - SDelete 등 영공간 정리 도구: 기본 스크립트에는 포함하지 않음
-  - 하이퍼바이저 전용 디스크 관리 도구: VM 디스크 compact용, 기본 스크립트에는 포함하지 않음
+- VirtualBox (또는 조직 표준 하이퍼바이저)
+- 배포 ZIP 파일 (`VM-Optimize.zip`)
+- D 드라이브용 VDI 파일 (또는 별도 파티션)
 
-## 3. OS 설치 및 Audit Mode 진입
+### VM 권장 설정
 
-1. 사용 중인 VM 환경에서 새 Windows 11 VM을 생성합니다.
-2. Windows 11 요구사항에 맞게 TPM, Secure Boot, CPU, Memory, Storage를 구성합니다.
-3. Windows 11 ISO를 연결하고 VM을 부팅합니다.
-4. 일반 설치 절차를 진행합니다.
-5. 설치 완료 후 OOBE 화면이 표시되면 일반 사용자 계정을 만들지 않습니다.
-6. OOBE 화면에서 `Ctrl + Shift + F3`을 눌러 Audit Mode로 진입합니다.
-7. 재부팅 후 Administrator 계정으로 자동 로그인되면 Sysprep 창을 닫거나 최소화합니다.
+| 항목 | 권장값 |
+|------|--------|
+| 펌웨어 | UEFI + Secure Boot |
+| TPM | 2.0 |
+| 메모리 | 4GB 이상 |
+| C 드라이브 | 64GB 이상, 동적 확장 VDI |
+| D 드라이브 | 별도 VDI, **Writethrough** 모드 |
 
-Audit Mode는 사용자 계정 생성 전 상태에서 드라이버, 앱, 정책, 정리 작업을 수행하기 위한 준비 모드입니다.
+---
 
-## 4. 별도 사용자 프로필 드라이브 준비
+## 4. OS 설치 및 Audit Mode 진입
 
-1. `diskmgmt.msc` 또는 `diskpart`로 OS 드라이브와 분리된 사용자 프로필용 파티션/디스크를 준비합니다.
-2. 설치 미디어 또는 게스트 도구 ISO가 사용자 프로필용 드라이브 문자를 점유하고 있으면 다른 문자로 변경합니다.
-3. 사용자 프로필용 파티션에 조직 표준 드라이브 문자를 할당합니다.
-4. NTFS로 포맷하고 조직 표준 볼륨 레이블을 지정합니다.
-5. 별도 사용자 프로필 드라이브 아래에 사용자 프로필 루트 폴더를 만듭니다.
+1. VirtualBox에서 Windows 11 VM을 새로 생성합니다.
+2. Windows 11 ISO를 연결하고 부팅합니다.
+3. 일반 설치 절차를 진행합니다.
+4. OOBE 화면이 표시되면 **일반 사용자 계정을 만들지 않습니다.**
+5. OOBE 화면에서 `Ctrl + Shift + F3`을 눌러 Audit Mode로 진입합니다.
+6. 재부팅 후 Administrator 계정으로 자동 로그인됩니다.
+7. Sysprep 창이 열리면 닫거나 최소화합니다.
 
-예시:
+---
 
-```powershell
-New-Item -ItemType Directory -Path '<ProfileDrive>:\Users' -Force
-icacls '<ProfileDrive>:\Users'
-```
+## 5. D 드라이브 준비
 
-`<ProfileDrive>`는 실제 운영 드라이브 문자로 치환해야 합니다.
+### 5.1 VirtualBox Writethrough 설정
 
-## 5. Sysprep unattend.xml 준비
-
-샘플 파일:
-
-```text
-scripts\sysprep\unattend.xml
-```
-
-핵심 설정:
-
-```xml
-<FolderLocations>
-  <ProfilesDirectory>&lt;ProfileDrive&gt;:\Users</ProfilesDirectory>
-</FolderLocations>
-<TimeZone>Korea Standard Time</TimeZone>
-```
-
-주의사항:
-
-- `unattend.xml`은 드라이브 문자를 자동 선택하지 않습니다.
-- 실제 Sysprep 실행 전 `<ProfileDrive>`를 조직 표준 사용자 프로필 드라이브 문자로 치환해야 합니다.
-- 해당 드라이브와 사용자 프로필 루트 폴더는 Sysprep 실행 전에 존재해야 합니다.
-- 기존 사용자 프로필을 `ProfileList` 레지스트리로 강제 이동하는 방식은 비권장입니다.
-
-권장 배치 위치:
-
-```text
-C:\Windows\System32\Sysprep\unattend.xml
-```
-
-복사 예시:
+스냅샷을 롤백해도 D 드라이브 데이터가 보존되도록 Writethrough 모드로 연결합니다.
+**VM이 종료된 상태에서** 호스트 PowerShell 또는 터미널에서 실행합니다.
 
 ```powershell
-Copy-Item '.\scripts\sysprep\unattend.xml' 'C:\Windows\System32\Sysprep\unattend.xml' -Force
+VBoxManage storageattach "VM이름" `
+    --storagectl "SATA" --port 1 --device 0 `
+    --type hdd --medium "D드라이브.vdi" `
+    --mtype writethrough
 ```
 
-### 5.1 선택: unattend.xml ISO 생성
-
-VM에 파일을 직접 복사하기 어렵다면 ISO로 전달할 수 있습니다.
+설정 확인:
 
 ```powershell
-Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
-.\scripts\sysprep\build-unattend-iso.ps1 -ProfileDrive E -OutputIso .\scripts\sysprep\unattend-E.iso
+VBoxManage showvminfo "VM이름" | findstr /i "writethrough"
 ```
 
-생성된 ISO를 VM에 연결한 뒤 Audit Mode에서 복사합니다.
+### 5.2 Audit Mode에서 D 드라이브 확인
+
+VM을 시작하고 Audit Mode 관리자 PowerShell에서 D 드라이브가 인식되는지 확인합니다.
 
 ```powershell
-Copy-Item '<ISODrive>:\unattend.xml' 'C:\Windows\System32\Sysprep\unattend.xml' -Force
+Get-PSDrive D
 ```
 
-`<ISODrive>`는 VM 안에서 ISO가 연결된 드라이브 문자입니다.
+D 드라이브가 없으면 `diskmgmt.msc` 또는 `diskpart`로 파티션을 초기화합니다.
+
+```cmd
+diskpart
+> list disk
+> select disk 1
+> create partition primary
+> format fs=ntfs label=UserData quick
+> assign letter=D
+> exit
+```
+
+`first_logon.ps1`이 최초 로그인 시 `D:\UserData\{사용자명}` 하위 폴더를 자동 생성하므로
+Audit Mode 단계에서는 D 드라이브 자체만 준비하면 됩니다.
+
+---
 
 ## 6. 최적화 스크립트 실행
 
-관리자 PowerShell에서 실행합니다.
+배포 ZIP의 파일들을 VM에 복사한 뒤 관리자 PowerShell에서 실행합니다.
 
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
-.\scripts\win11_master_template_optimize.ps1 --standard
+.\win11_master_template_optimize.ps1 --standard
 ```
 
-모드:
+### 모드 선택 기준
 
 | 모드 | 설명 | 권장 상황 |
-| --- | --- | --- |
-| `--lite` | 보수적/저위험 정리 | 공공기관/망분리 초기 검증, 영향도 최소화 |
-| `--standard` | 기본 균형형 최적화 | 일반적인 VM 마스터 템플릿 |
-| `--advanced` | 강한 정리/비활성화 | 복제 VM 검증 후 제한적으로 사용 |
+|------|------|----------|
+| `--lite` | 보수적/저위험 정리 | 공공기관, 망분리 환경 초기 검증 |
+| `--standard` | 기본 균형형 최적화 | 일반적인 VM 마스터 템플릿 (기본값) |
+| `--advanced` | 강한 정리/비활성화 | 복제 VM 검증 완료 후 제한적 사용 |
 
-주요 작업:
+### 주요 수행 작업
 
-- Temp/Cache 정리
-- Windows Update 다운로드 캐시 정리
-- Defender scan history 정리
+- Temp / Cache / Update 다운로드 캐시 정리
+- Defender 검사 기록 정리
 - 이벤트 로그 초기화
-- hibernation 비활성화
+- Hibernation 비활성화
 - Appx 및 Provisioned Appx 제거
-- 서비스/예약 작업 비활성화
-- Search/Bing/Copilot/Recall/Consumer/privacy 정책 설정
-- 전원 계획, 탐색기 개인정보, 시작 메뉴, 작업표시줄, 잠금화면 콘텐츠 정리
-- cleanmgr 실행
-- DISM component cleanup 실행
+- 서비스 / 예약 작업 비활성화
+- Search / Bing / Copilot / Recall / Consumer / Privacy 정책 설정
+- 전원 계획, 탐색기, 시작 메뉴, 작업 표시줄, 잠금 화면 조정
+- cleanmgr / DISM component cleanup 실행
 
-## 7. 정리 대상과 주의사항
+---
 
-| 경로/항목 | 역할 | 삭제 가능 여부 | 주의사항 |
-| --- | --- | --- | --- |
-| `C:\Windows\Temp` | 시스템 임시 파일 | 일반적으로 가능 | 설치/업데이트 중에는 일부 파일이 잠길 수 있음 |
-| `%TEMP%`, `%TMP%` | 현재 사용자 임시 파일 | 가능 | Audit Mode Administrator 기준 정리 |
-| `C:\Users\*\AppData\Local\Temp` | 사용자별 임시 파일 | 가능 | 사용자 앱 세션 파일 포함 가능 |
-| `C:\Windows\SoftwareDistribution\Download` | Windows Update 다운로드 캐시 | 가능 | 업데이트 설치 중 삭제 금지 |
-| `C:\Windows\Panther` | Windows 설치 로그 | 조건부 가능 | Sysprep 실패 분석 전 삭제 금지 |
-| `C:\Windows\System32\Sysprep\Panther` | Sysprep 로그 | 조건부 가능 | Sysprep 실패 원인 분석 핵심 위치 |
-| `C:\ProgramData\Microsoft\Windows Defender\Scans\History` | Defender 검사 기록 | 가능 | 보안 감사상 보존 필요 여부 확인 |
-| 이벤트 로그 | 시스템/응용 프로그램/보안 이벤트 | 조건부 가능 | 감사/장애 분석 필요 시 보존 |
-| `hiberfil.sys` | 최대 절전 파일 | 가능 | VM 템플릿에서는 보통 제거 권장 |
-| `pagefile.sys` | 페이지 파일 | 비권장/옵션 | 덤프/메모리 압박 대응에 필요할 수 있음 |
-| `C:\ProgramData\Package Cache` | 설치 패키지 캐시 | 비권장 | MSI/런타임 복구에 필요할 수 있음 |
+## 7. Sysprep 파일 배치
 
-운영 원칙:
+`unattend.xml`, `first_logon.ps1`, `SetupComplete.cmd` 세 파일을 모두 배치해야 합니다.
 
-1. 정리 작업은 Sysprep 직전 1회 수행을 원칙으로 합니다.
-2. 업데이트, 드라이버, 보안 제품 설치 중에는 캐시를 삭제하지 않습니다.
-3. 감사 또는 장애 분석에 필요한 로그는 삭제 전 보존 여부를 결정합니다.
-4. 삭제 항목과 실행 시점은 변경 이력에 기록합니다.
+### 방법 A: 직접 복사 (권장)
 
-## 8. 공공기관/망분리 체크포인트
+```powershell
+# sysprep 폴더가 배포 ZIP 기준 경로에 있는 경우
+Copy-Item ".\sysprep\unattend.xml"      "C:\Windows\System32\Sysprep\unattend.xml" -Force
+Copy-Item ".\sysprep\first_logon.ps1"   "C:\Windows\Setup\Scripts\first_logon.ps1" -Force
+Copy-Item ".\sysprep\setupcomplete.cmd" "C:\Windows\Setup\Scripts\SetupComplete.cmd" -Force
+```
 
-### 8.1 Administrator 계정/폴더
+`C:\Windows\Setup\Scripts` 폴더가 없으면 먼저 생성합니다.
 
-- Administrator 바탕 화면, 다운로드, 문서 폴더에 작업 파일이 남아 있지 않은지 확인
-- `%TEMP%` 및 `C:\Users\Administrator\AppData\Local\Temp` 정리
-- 브라우저 다운로드 기록, 캐시, 자동 완성 데이터 정리
-- Administrator 계정 활성/비활성 정책 확인
-- 임시 비밀번호가 이미지에 남지 않도록 관리
+```powershell
+New-Item -ItemType Directory -Path "C:\Windows\Setup\Scripts" -Force
+```
 
-### 8.2 defaultuser0
+### 방법 B: ISO 생성 후 마운트
 
-- 기본 OS 프로필 경로 또는 별도 사용자 프로필 드라이브 아래의 `defaultuser0` 존재 여부 확인
-- Sysprep 전 단계에서 무리하게 삭제하지 않음
-- OOBE 테스트 후 잔여 계정으로 확인될 때 정리 검토
+```powershell
+# 호스트 또는 Audit Mode PowerShell에서 실행
+Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
+.\sysprep\build-unattend-iso.ps1
+# → 같은 폴더에 vmsetup.iso 생성
+```
 
-### 8.3 앱/클라우드/소비자 기능
+ISO를 VM에 마운트한 뒤:
 
-검토 대상:
+```powershell
+$iso = (Get-Volume | Where-Object { $_.FileSystemLabel -eq 'VMSETUP' }).DriveLetter + ':'
+Copy-Item "$iso\unattend.xml"  "C:\Windows\System32\Sysprep\unattend.xml" -Force
+Copy-Item "$iso\Scripts\*"     "C:\Windows\Setup\Scripts\"               -Force
+```
 
-- Phone Link
-- Xbox 관련 앱
-- Copilot 관련 앱 또는 정책
-- Teams 개인용 구성요소
-- 소비자 경험 기반 추천 앱
-- Bing/Web/Cloud Search
-- Recall/AI 스냅샷성 기능
+### 배치 위치 요약
 
-정책 방향:
+| 파일 | 배치 위치 | 실행 시점 |
+|------|----------|----------|
+| `unattend.xml` | `C:\Windows\System32\Sysprep\` | Sysprep 실행 시 |
+| `SetupComplete.cmd` | `C:\Windows\Setup\Scripts\` | OOBE 완료 직후 (로그인 전, SYSTEM) |
+| `first_logon.ps1` | `C:\Windows\Setup\Scripts\` | 최초 사용자 로그인 시 자동 실행 |
 
-- 제거보다 비활성화가 안전한 항목은 비활성화를 우선 검토합니다.
-- 제거 후보는 `configs/appx-remove-list.txt`에서 관리합니다.
-- 업무 앱과 보안 에이전트 영향도를 복제 VM에서 검증합니다.
+---
 
-### 8.4 감사 대응 기록
+## 8. Sysprep 실행
 
-다음을 기록합니다.
-
-- 적용 모드
-- 실행 스크립트 버전 또는 커밋
-- 적용 일시와 실행자
-- 삭제한 Appx 목록
-- 비활성화한 서비스/예약 작업 목록
-- 적용한 정책 키
-- 업무 앱 검증 결과
-- Sysprep 결과
-- 후처리 및 보관 검증 결과
-
-## 9. Sysprep 실행
-
-Sysprep 전 별도 관리 중인 검증 문서와 아래 핵심 항목을 확인한 뒤 실행합니다.
+파일 배치와 최적화 스크립트 실행을 완료한 뒤 아래 명령을 실행합니다.
 
 ```cmd
 C:\Windows\System32\Sysprep\Sysprep.exe /generalize /oobe /shutdown /unattend:C:\Windows\System32\Sysprep\unattend.xml
 ```
 
-옵션:
+| 옵션 | 역할 |
+|------|------|
+| `/generalize` | SID, 장치 고유 정보 일반화. `CopyProfile=true`가 이 단계에서 실행됨 |
+| `/oobe` | 다음 부팅 시 OOBE 진입 |
+| `/shutdown` | Sysprep 완료 후 VM 자동 종료 |
+| `/unattend` | 응답 파일 지정 |
 
-- `/generalize`: SID, 장치 고유 정보 등 일반화
-- `/oobe`: 다음 부팅 시 OOBE로 진입
-- `/shutdown`: Sysprep 완료 후 종료
-- `/unattend`: 응답 파일 지정
+Sysprep 완료 후 VM이 자동으로 종료됩니다.
 
-Sysprep 실패 시 확인 위치:
+### Sysprep 실패 시 확인 로그
 
-- `C:\Windows\System32\Sysprep\Panther\setuperr.log`
-- `C:\Windows\System32\Sysprep\Panther\setupact.log`
-- `C:\Windows\Panther\setuperr.log`
-- `C:\Windows\Panther\setupact.log`
+```text
+C:\Windows\System32\Sysprep\Panther\setuperr.log
+C:\Windows\System32\Sysprep\Panther\setupact.log
+C:\Windows\Panther\setuperr.log
+```
 
-## 10. 종료 및 후처리
+---
 
-Sysprep이 정상 완료되면 VM이 종료됩니다.
+## 9. 최초 로그인 자동화 (first_logon.ps1)
 
-중요:
+Sysprep 후 VM을 배포해 처음 로그인하면 `unattend.xml`의 `FirstLogonCommands`에 의해
+`first_logon.ps1`이 자동 실행됩니다. 별도 조작 없이 다음 작업이 자동 처리됩니다.
 
-- 종료 후 원본 VM을 다시 부팅하지 않습니다.
-- 먼저 디스크 파일을 복제하거나 스냅샷/템플릿 정책을 적용합니다.
-- 원본을 부팅하면 OOBE가 진행되어 템플릿 상태가 변경될 수 있습니다.
+| 단계 | 내용 |
+|------|------|
+| 1 | `D:\UserData\{사용자명}` 폴더 구조 생성 |
+| 2 | Desktop / Documents / Downloads / Pictures / Videos / Music → `D:\UserData` 리디렉션 |
+| 3 | Appx 제거 (Xbox, PhoneLink, Copilot, Teams, Clipchamp) |
+| 4 | Provisioned Appx 제거 (신규 사용자 자동 설치 차단) |
+| 5 | HKCU 설정 재적용 (Search, Copilot, Consumer Experience, Telemetry, Explorer) |
+| 6 | Explorer 재시작 |
+| 7 | 재실행 방지 플래그 설정 |
 
-선택 후처리:
+D 드라이브가 없는 환경에서는 리디렉션 단계를 건너뛰고 나머지 작업을 계속합니다.
 
-- 영공간 zero-fill: 외부 도구를 수동 사용
-- VM 디스크 compact: 사용 중인 하이퍼바이저의 디스크 관리 도구 수동 사용
-- 보관이 필요한 경우 조직 표준 도구와 절차를 별도로 사용
+실행 로그: `C:\Windows\Logs\first_logon.log`
 
-## 11. 핵심 검증 항목
+재실행 방지 플래그: `HKCU:\Software\VMTemplateSetup\FirstLogonComplete`
 
-검증 체크리스트는 별도 문서로 관리합니다. 이 저장소에서는 Sysprep 전후 반드시 확인할 핵심 기준만 유지합니다.
+---
 
-- 별도 사용자 프로필 드라이브와 사용자 프로필 루트 폴더 존재 여부
-- `unattend.xml`의 `<ProfileDrive>` 치환 여부
-- `ProfilesDirectory`와 `TimeZone` 값 확인
-- 최적화 스크립트 실행 로그 확인
-- Appx, 서비스, 예약 작업, 정책 적용 결과 확인
-- Administrator/defaultuser0 잔여 상태 확인
-- Sysprep 로그 오류 여부 확인
-- OOBE 후 신규 사용자 프로필 경로 확인
-- 조직 표준 후처리 및 보관 검증 결과 확인
+## 10. 종료 후 처리
+
+### 10.1 주의 사항
+
+- Sysprep 종료 후 원본 VM을 다시 부팅하지 않습니다.
+- 부팅하면 OOBE가 진행되어 템플릿 상태가 변경됩니다.
+- 먼저 디스크 파일을 복제하거나 스냅샷 정책을 적용합니다.
+
+### 10.2 VHD 크기 최적화 (선택)
+
+#### 1단계: SDelete로 여유 공간 Zero-Fill
+
+Sysprep 직전 또는 VM 종료 전 관리자 PowerShell에서 실행합니다.
+
+```cmd
+sdelete64.exe -z C:
+```
+
+SDelete 다운로드: https://learn.microsoft.com/en-us/sysinternals/downloads/sdelete
+
+#### 2단계: VHD Compact
+
+VM이 완전히 종료된 상태에서 호스트 PowerShell에서 실행합니다.
+
+```powershell
+# VirtualBox 예시
+VBoxManage modifymedium disk "C드라이브.vdi" --compact
+```
+
+---
+
+## 11. 정리 대상 및 주의사항
+
+| 경로 / 항목 | 삭제 가능 여부 | 주의사항 |
+|------------|--------------|---------|
+| `C:\Windows\Temp` | 가능 | 설치/업데이트 중 일부 파일 잠김 |
+| `%TEMP%` | 가능 | Audit Mode Administrator 기준 |
+| `C:\Windows\SoftwareDistribution\Download` | 가능 | 업데이트 중 삭제 금지 |
+| `C:\Windows\Panther` | 조건부 | Sysprep 실패 분석 전 삭제 금지 |
+| Defender 검사 기록 | 가능 | 보안 감사 보존 정책 확인 |
+| 이벤트 로그 | 조건부 | 감사/장애 분석 필요 시 보존 |
+| `hiberfil.sys` | 가능 | VM에서는 제거 권장 |
+| `pagefile.sys` | 비권장 | 메모리 압박/덤프 대응에 필요 |
+
+---
+
+## 12. 공공기관 / 망분리 체크포인트
+
+### 12.1 Administrator 계정 정리
+
+- 바탕화면, 다운로드, 문서에 작업 파일이 남아 있지 않은지 확인
+- `%TEMP%` 및 `C:\Users\Administrator\AppData\Local\Temp` 정리
+- 브라우저 다운로드 기록, 캐시, 자동 완성 데이터 정리
+
+### 12.2 제거/비활성화 검토 항목
+
+- Phone Link / Xbox 관련 앱
+- Copilot 관련 앱 및 정책
+- Teams 개인용 구성요소
+- 소비자 경험 기반 추천 앱
+- Bing / 웹 검색 / 클라우드 Search
+- Recall / AI 스냅샷 기능
+
+### 12.3 감사 대응 기록 항목
+
+- 적용 모드 및 스크립트 버전
+- 실행 일시 및 실행자
+- 제거한 Appx 목록
+- 비활성화한 서비스 / 예약 작업 목록
+- 적용한 정책 키 목록
+- 업무 앱 검증 결과
+- Sysprep 결과 및 로그
+- 후처리 및 보관 검증 결과
+
+---
+
+## 13. 핵심 검증 체크리스트
+
+Sysprep 전 다음 항목을 확인합니다.
+
+- [ ] D 드라이브가 Writethrough 모드로 연결되어 있음
+- [ ] `C:\Windows\System32\Sysprep\unattend.xml` 배치 완료
+- [ ] `C:\Windows\Setup\Scripts\first_logon.ps1` 배치 완료
+- [ ] `C:\Windows\Setup\Scripts\SetupComplete.cmd` 배치 완료
+- [ ] 최적화 스크립트 실행 로그 오류 없음
+- [ ] Administrator 잔여 파일 정리 완료
+- [ ] Sysprep 로그 오류 없음 (`Panther\setuperr.log`)
+
+Sysprep 후 최초 로그인 시 확인합니다.
+
+- [ ] `C:\Windows\Logs\first_logon.log` 정상 완료 메시지 확인
+- [ ] `D:\UserData\{사용자명}` 폴더 생성 확인
+- [ ] 바탕화면 / 문서 / 다운로드가 D 드라이브를 가리키는지 확인
+- [ ] 불필요 Appx 제거 확인
+
+---
 
 공식 변경 이력은 `CHANGELOG.md`에 기록합니다.

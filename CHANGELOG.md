@@ -6,6 +6,69 @@
 - `메이저버전`: 프로젝트 기준선 또는 운영 방식이 크게 바뀌는 변경입니다.
 - `마이너버전`: 동일 메이저 기준선 안에서 누적되는 기능/문서/검증 개선 변경입니다.
 
+## [26.1.10] - 2026-04-21
+
+### Added
+
+- `scripts/sysprep/first_logon.ps1` 추가
+  - OOBE 후 최초 로그인 시 `unattend.xml`의 `FirstLogonCommands`에 의해 자동 실행됩니다.
+  - `D:\UserData\{사용자명}` 폴더 구조(Desktop/Documents/Downloads/Pictures/Videos/Music) 자동 생성.
+  - 쉘 폴더(Desktop/Documents/Downloads/Pictures/Videos/Music)를 `D:\UserData`로 리디렉션합니다.
+    Downloads는 Known Folder GUID(`{374DE290-123F-4565-9164-39C4925E467B}`) 키를 사용합니다.
+  - Appx 및 Provisioned Appx 제거 (Xbox, PhoneLink, Copilot, Teams, Clipchamp).
+  - HKCU 설정 재적용: Search/Bing/Cortana 비활성화, Copilot 비활성화, Consumer Experience 비활성화, Telemetry 최소화, Explorer 최근 항목 비활성화.
+  - Explorer 재시작으로 리디렉션 즉시 반영.
+  - `HKCU:\Software\VMTemplateSetup\FirstLogonComplete` 플래그로 재실행 방지.
+  - 실행 로그: `C:\Windows\Logs\first_logon.log`.
+  - D 드라이브 없는 환경에서는 리디렉션을 건너뛰고 나머지 작업 계속 진행.
+- `scripts/sysprep/setupcomplete.cmd` 추가
+  - Windows Setup 완료 후 SYSTEM 권한으로 자동 실행되는 사전 준비 훅.
+  - `C:\Windows\Logs`, `C:\Windows\Setup\Scripts` 디렉터리 확보.
+  - PowerShell LocalMachine 실행 정책을 RemoteSigned로 완화.
+
+### Changed
+
+- `scripts/sysprep/unattend.xml` 전면 재작성
+  - 기존: `ProfilesDirectory`로 `C:\Users` 전체를 D 드라이브로 이동하는 방식.
+  - 변경: `C:\Users` 위치 유지 + `CopyProfile=true` + `FirstLogonCommands` 조합으로 전환.
+  - `generalize` 패스에 `CopyProfile=true` 추가: Audit Mode 사용자 설정을 Default Profile로 복사.
+  - `oobeSystem` 패스에 `FirstLogonCommands` 추가: `first_logon.ps1` 자동 실행 연결.
+  - OOBE 간소화 설정 추가: `HideEULAPage`, `HideOEMRegistrationScreen`, `SkipMachineOOBE` 등.
+  - `ProfilesDirectory` 방식 제거: VirtualBox 스냅샷 구조/Sysprep/Store 앱 충돌 방지.
+- `scripts/sysprep/build-unattend-iso.ps1` 개선
+  - `-ProfileDrive` 필수 파라미터 제거 (ProfilesDirectory 방식 폐기에 따른 변경).
+  - ISO에 `unattend.xml` 외 `Scripts/first_logon.ps1`, `Scripts/SetupComplete.cmd` 번들링 추가.
+  - 출력 ISO 이름 변경: `unattend.iso` → `vmsetup.iso`, 볼륨 이름: `UNATTEND` → `VMSETUP`.
+  - ISO 내 `README.txt`에 배치 명령 및 아키텍처 설명 업데이트.
+- `.github/workflows/release.yml` 릴리스 ZIP 구조 개선
+  - `sysprep/` 서브디렉터리 추가: `unattend.xml`, `first_logon.ps1`, `setupcomplete.cmd`, `build-unattend-iso.ps1` 포함.
+  - `docs/` 서브디렉터리 추가: `guide.md` 포함.
+- `docs/guide.md` 전면 재작성
+  - 새 아키텍처(C:\Users 유지 + D:\UserData 쉘 폴더 리디렉션) 기준으로 전체 재작성.
+  - VirtualBox D 드라이브 Writethrough 설정 명령 추가.
+  - `first_logon.ps1`, `setupcomplete.cmd` 배치 방법(직접 복사/ISO) 상세 안내.
+  - 배포 ZIP 파일 구조, Sysprep 전후 검증 체크리스트 추가.
+- `README.md` 업데이트
+  - 섹션 5 디렉터리 구조에 신규 파일(`first_logon.ps1`, `setupcomplete.cmd`) 반영.
+  - 섹션 6.4를 D 드라이브(UserData) 구성 방식으로 전면 교체.
+  - 섹션 6.5를 Sysprep 파일 배치 안내(ISO/직접 복사)로 전면 교체.
+- `scripts/win11_master_template_optimize.ps1` 인코딩 수정
+  - UTF-8 without BOM → UTF-8 with BOM 으로 변경 (Windows PowerShell 5.x 한글 파싱 오류 수정).
+
+### Removed
+
+- `scripts/sysprep/unattend.xml`에서 `<FolderLocations><ProfilesDirectory>` 설정 제거.
+  - Users 폴더 전체 이동 방식은 스냅샷 구조와 충돌하므로 폐기.
+- `scripts/sysprep/build-unattend-iso.ps1`에서 `-ProfileDrive` 파라미터 제거.
+
+### Verification
+
+- `first_logon.ps1` D 드라이브 없는 환경 조건 분기 확인
+- `unattend.xml` XML 구조 검증 통과
+- `build-unattend-iso.ps1` 소스 파일 존재 여부 검증 로직 확인
+- 릴리스 ZIP `sysprep/`, `docs/` 서브디렉터리 구조 확인
+- `win11_master_template_optimize.ps1` UTF-8 BOM 적용 확인
+
 ## [26.1.9] - 2026-04-20
 
 ### Added
