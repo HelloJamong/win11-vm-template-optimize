@@ -61,6 +61,14 @@
   - Users 폴더 전체 이동 방식은 스냅샷 구조와 충돌하므로 폐기.
 - `scripts/sysprep/build-unattend-iso.ps1`에서 `-ProfileDrive` 파라미터 제거.
 
+### Fixed
+
+- `.github/workflows/release.yml` 릴리즈 노트 bash 백틱 해석 오류 수정
+  - CHANGELOG 마크다운 백틱(`` ` ``)이 bash 명령으로 실행되던 문제 수정.
+  - awk 출력을 셸 변수 대신 temp 파일에 직접 저장하고 `cat`으로 읽도록 변경.
+  - `Version.txt` 생성 시 `echo "${{ }}"` 대신 `cat notes_file` 방식으로 교체.
+  - GitHub Release `body:` → `body-path:` 로 교체.
+
 ### Verification
 
 - `first_logon.ps1` D 드라이브 없는 환경 조건 분기 확인
@@ -68,6 +76,7 @@
 - `build-unattend-iso.ps1` 소스 파일 존재 여부 검증 로직 확인
 - 릴리스 ZIP `sysprep/`, `docs/` 서브디렉터리 구조 확인
 - `win11_master_template_optimize.ps1` UTF-8 BOM 적용 확인
+- 릴리즈 워크플로 백틱 오류 수정 확인
 
 ## [26.1.9] - 2026-04-20
 
