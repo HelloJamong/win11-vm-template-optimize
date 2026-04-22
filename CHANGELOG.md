@@ -6,6 +6,21 @@
 - `메이저버전`: 프로젝트 기준선 또는 운영 방식이 크게 바뀌는 변경입니다.
 - `마이너버전`: 동일 메이저 기준선 안에서 누적되는 기능/문서/검증 개선 변경입니다.
 
+## [26.1.12] - 2026-04-22
+
+### Fixed
+
+- `scripts/sysprep/unattend.xml` OOBE 계정 생성 화면 누락 수정
+  - `<SkipMachineOOBE>true</SkipMachineOOBE>` 및 `<SkipUserOOBE>true</SkipUserOOBE>` 제거.
+  - 두 설정이 사용자 계정 생성 단계를 건너뛰면서 `<UserAccounts>` 미정의 상태와 결합되어
+    Sysprep 재부팅 후 로그인 화면만 표시되고 계정 생성 자체가 불가능한 문제 수정.
+  - `<HideOnlineAccountScreens>true</HideOnlineAccountScreens>` 는 유지되어
+    Microsoft 계정 요구 없이 로컬 계정 생성 화면이 정상 표시됩니다.
+
+### Verification
+
+- Sysprep 재부팅 후 로컬 계정 생성 화면 진입 확인
+
 ## [26.1.11] - 2026-04-22
 
 ### Fixed

@@ -65,8 +65,6 @@
         <HideOEMRegistrationScreen>true</HideOEMRegistrationScreen>
         <HideOnlineAccountScreens>true</HideOnlineAccountScreens>
         <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
-        <SkipMachineOOBE>true</SkipMachineOOBE>
-        <SkipUserOOBE>true</SkipUserOOBE>
         <!-- 3 = Windows 기본 보호 설정 적용 (자동) -->
         <ProtectYourPC>3</ProtectYourPC>
       </OOBE>
