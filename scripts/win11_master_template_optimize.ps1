@@ -81,7 +81,12 @@ $ErrorActionPreference = 'SilentlyContinue'
 # 엄격한 검증이 필요하면 개별 함수 내부의 로그와 Windows 이벤트/PowerShell 오류를 함께 확인하십시오.
 
 $Script:RootDir = Split-Path -Parent $PSScriptRoot
-$Script:ConfigDir = Join-Path $Script:RootDir 'configs'
+# 배포 환경(스크립트와 configs/ 동일 레벨)과 개발 환경(scripts/ 하위) 모두 지원
+$Script:ConfigDir = if (Test-Path (Join-Path $PSScriptRoot 'configs')) {
+    Join-Path $PSScriptRoot 'configs'
+} else {
+    Join-Path $Script:RootDir 'configs'
+}
 $Script:LogFile = Join-Path $env:SystemDrive 'win11_template_optimize.log'
 
 # =========================================================

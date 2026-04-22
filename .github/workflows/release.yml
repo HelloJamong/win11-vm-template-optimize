@@ -63,12 +63,18 @@ jobs:
           mkdir -p _release/_iso
           mkdir -p _release/sysprep
           mkdir -p _release/docs
+          mkdir -p _release/configs
 
           # Audit Mode 최적화 스크립트
           cp scripts/win11_master_template_optimize.ps1 _release/
 
           # VM_optimize ISO 생성 도구 (sdelete 등 추가 파일 번들용)
           cp scripts/build-vm-optimize-iso.ps1          _release/
+
+          # 커스텀 목록 파일 (Appx/서비스/예약작업 후보)
+          cp configs/appx-remove-list.txt               _release/configs/
+          cp configs/services-disable-list.txt          _release/configs/
+          cp configs/tasks-disable-list.txt             _release/configs/
 
           # Sysprep 관련 파일 일체
           cp scripts/sysprep/unattend.xml               _release/sysprep/
