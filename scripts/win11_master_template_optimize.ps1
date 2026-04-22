@@ -232,6 +232,30 @@ $EnableDefragFreeSpace             = $false
 # defrag /X 로 여유 공간을 통합합니다. VHD compact 전 압축률 향상에 유효합니다.
 # 소요 시간이 길고 SSD/NVMe 기반 VM에서는 불필요하므로 기본 false입니다.
 
+$EnableControlPanelViewTweak       = $true
+# 제어판 보기 기준을 '큰 아이콘'으로 변경합니다.
+
+$EnableBootTimeoutTweak            = $true
+# 시작 및 복구: 운영 체제 목록 표시 시간을 3초로 설정합니다. (bcdedit /timeout 3)
+
+$EnableSystemVolumeTweak           = $true
+# 시스템 기본 볼륨을 50%로 설정합니다. Windows Core Audio API 사용.
+
+$EnableComputerRename              = $true
+# 컴퓨터 이름을 VDI-Win11로 변경합니다. Sysprep 전 적용 권장. (재부팅 필요)
+
+$EnableVisualEffectsTweak          = $true
+# 성능 옵션 시각 효과를 Custom 모드로 설정합니다.
+# 켜는 항목: 아이콘 레이블 그림자 / 미리 보기 / 창 아래 그림자 / 글꼴 가장자리 다듬기(ClearType)
+
+$EnableDesktopIcons                = $true
+# 바탕화면에 '내 PC'와 '제어판' 시스템 아이콘을 표시합니다.
+# HideDesktopIcons 레지스트리 키를 통해 설정합니다.
+
+$EnableStartMenuPinnedCleanup      = $true
+# 시작 메뉴 고정 항목을 Edge / 파일 탐색기 / 설정 3개만 남기고 모두 제거합니다.
+# LayoutModification.json 을 작성해 적용합니다.
+
 
 # -----------------------------
 # Logging
@@ -515,6 +539,13 @@ function Apply-ModePreset {
             EnableSetupLogCleanup            = $false
             EnableResetBase                  = $false
             EnableDefragFreeSpace            = $false
+            EnableControlPanelViewTweak      = $false
+            EnableBootTimeoutTweak           = $false
+            EnableSystemVolumeTweak          = $false
+            EnableComputerRename             = $false
+            EnableVisualEffectsTweak         = $false
+            EnableDesktopIcons               = $true
+            EnableStartMenuPinnedCleanup     = $true
         }
         standard = @{
             EnableTempCleanup                = $true
@@ -549,6 +580,13 @@ function Apply-ModePreset {
             EnableSetupLogCleanup            = $false
             EnableResetBase                  = $true
             EnableDefragFreeSpace            = $false
+            EnableControlPanelViewTweak      = $true
+            EnableBootTimeoutTweak           = $true
+            EnableSystemVolumeTweak          = $true
+            EnableComputerRename             = $true
+            EnableVisualEffectsTweak         = $true
+            EnableDesktopIcons               = $true
+            EnableStartMenuPinnedCleanup     = $true
         }
         advanced = @{
             EnableTempCleanup                = $true
@@ -583,6 +621,13 @@ function Apply-ModePreset {
             EnableSetupLogCleanup            = $true
             EnableResetBase                  = $true
             EnableDefragFreeSpace            = $false
+            EnableControlPanelViewTweak      = $true
+            EnableBootTimeoutTweak           = $true
+            EnableSystemVolumeTweak          = $true
+            EnableComputerRename             = $true
+            EnableVisualEffectsTweak         = $true
+            EnableDesktopIcons               = $true
+            EnableStartMenuPinnedCleanup     = $true
         }
     }
 
@@ -618,31 +663,44 @@ Write-OptionSummary
 # 후보 목록 구성
 # -----------------------------
 $DefaultAppxPatterns = @(
+    # 게임
     '*Xbox*',
     '*GamingApp*',
+    # 미디어/편집
     '*Clipchamp*',
+    '*ZuneMusic*',
+    '*ZuneVideo*',
+    '*WindowsCamera*',
+    '*WindowsSoundRecorder*',
+    # 커뮤니케이션/협업
     '*Teams*',
+    '*SkypeApp*',
+    '*YourPhone*',
+    '*CrossDevice*',
+    '*WindowsCommunicationsApps*',  # Mail & Calendar
+    # M365 / Office 번들
+    '*MicrosoftOfficeHub*',
+    '*OutlookForWindows*',
+    '*Todos*',
+    '*PowerAutomateDesktop*',
+    '*OneNote*',
+    # AI / 보조
+    '*Copilot*',
+    '*549981C3F5F10*',              # Cortana
+    # 소비자 앱
     '*BingNews*',
     '*BingWeather*',
     '*Maps*',
-    '*ZuneMusic*',
-    '*ZuneVideo*',
     '*MicrosoftSolitaireCollection*',
     '*People*',
+    '*MicrosoftStickyNotes*',
+    '*WindowsAlarms*',
     '*WindowsFeedbackHub*',
     '*GetHelp*',
     '*Getstarted*',
-    '*YourPhone*',
-    '*CrossDevice*',
-    '*Copilot*'
+    '*DevHome*',
+    '*QuickAssist*'
 )
-# 제거 대상 예:
-# Xbox/GamingApp: 게임 관련
-# Clipchamp/Teams: 번들 앱
-# BingNews/BingWeather/Maps: 소비자 앱
-# ZuneMusic/ZuneVideo: 미디어 앱
-# YourPhone/CrossDevice: 모바일 디바이스 연동
-# Copilot: AI/보조 기능
 
 $ConfigAppxPatterns = ConvertTo-WildcardPattern -Items (Read-ListFile -Path (Join-Path $Script:ConfigDir 'appx-remove-list.txt'))
 $AppxPatterns = Get-UniqueList -Items ($DefaultAppxPatterns + $ConfigAppxPatterns)
@@ -1384,6 +1442,223 @@ if ($EnableEdgeTweaks -and (Confirm-Step -Title '[+] Microsoft Edge 최적화 (V
 }
 # VDOT(Virtual Desktop Optimization Tool) 기준 Edge 정책 항목을 적용합니다.
 # HKCU 항목은 현재 감사 모드 계정에만 적용되며 Sysprep 후 신규 사용자에게는 별도 적용이 필요합니다.
+
+# -----------------------------
+# Control Panel View Tweak
+# -----------------------------
+if ($EnableControlPanelViewTweak -and (Confirm-Step -Title '[+] 제어판 보기 기준: 큰 아이콘' -Details @(
+    'AllItemsIconView = 0 (큰 아이콘)',
+    'StartupPage = 1 (모든 항목 보기)'
+))) {
+    Write-Log 'Applying Control Panel large icon view'
+    Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\ControlPanel' 'AllItemsIconView' 0
+    Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\ControlPanel' 'StartupPage'      1
+}
+
+# -----------------------------
+# Boot Timeout Tweak
+# -----------------------------
+if ($EnableBootTimeoutTweak -and (Confirm-Step -Title '[+] 시작 및 복구: OS 목록 표시 시간 3초' -Details @(
+    'bcdedit /timeout 3'
+))) {
+    Write-Log 'Setting boot timeout to 3 seconds'
+    try {
+        Start-Process bcdedit.exe '/timeout 3' -Wait -NoNewWindow -ErrorAction Stop
+        Write-Log 'Boot timeout set to 3s'
+    } catch {
+        Write-Log "bcdedit 실행 실패 — $_" 'WARN'
+    }
+}
+
+# -----------------------------
+# System Volume Tweak
+# -----------------------------
+if ($EnableSystemVolumeTweak -and (Confirm-Step -Title '[+] 시스템 볼륨 50% 설정' -Details @(
+    'Windows Core Audio API (IAudioEndpointVolume) 사용',
+    'SetMasterVolumeLevelScalar(0.5)'
+))) {
+    Write-Log 'Setting system master volume to 50%'
+    try {
+        if (-not ('AudioVolumeHelper' -as [type])) {
+            Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+[ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")]
+class MMDeviceEnumerator {}
+[Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IMMDeviceEnumerator {
+    int EnumAudioEndpoints(int df, int sm, out IntPtr pp);
+    int GetDefaultAudioEndpoint(int df, int role, [MarshalAs(UnmanagedType.Interface)] out IMMDevice ppDev);
+}
+[Guid("D666063F-1587-4E43-81F1-B948E807363F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IMMDevice {
+    int Activate([MarshalAs(UnmanagedType.LPStruct)] Guid iid, int ctx, IntPtr p, [MarshalAs(UnmanagedType.IUnknown)] out object ppI);
+    int OpenPropertyStore(int access, out IntPtr pp);
+    int GetId([MarshalAs(UnmanagedType.LPWStr)] out string id);
+    int GetState(out int state);
+}
+[Guid("5CDF2C82-841E-4546-9722-0CF74078229A"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IAudioEndpointVolume {
+    int RegisterControlChangeNotify(IntPtr pNotify);
+    int UnregisterControlChangeNotify(IntPtr pNotify);
+    int GetChannelCount(out int pnChannelCount);
+    int SetMasterVolumeLevel(float fLevelDB, [MarshalAs(UnmanagedType.LPStruct)] Guid pguidEventContext);
+    int SetMasterVolumeLevelScalar(float fLevel, [MarshalAs(UnmanagedType.LPStruct)] Guid pguidEventContext);
+}
+public static class AudioVolumeHelper {
+    public static void SetVolume(float level) {
+        var enumerator = (IMMDeviceEnumerator)new MMDeviceEnumerator();
+        IMMDevice device;
+        enumerator.GetDefaultAudioEndpoint(0, 1, out device);
+        object volObj;
+        var iid = new Guid("5CDF2C82-841E-4546-9722-0CF74078229A");
+        device.Activate(iid, 23, IntPtr.Zero, out volObj);
+        var vol = (IAudioEndpointVolume)volObj;
+        vol.SetMasterVolumeLevelScalar(level, Guid.Empty);
+        Marshal.ReleaseComObject(vol);
+        Marshal.ReleaseComObject(device);
+        Marshal.ReleaseComObject(enumerator);
+    }
+}
+'@
+        }
+        [AudioVolumeHelper]::SetVolume(0.5)
+        Write-Log 'System volume set to 50%'
+    } catch {
+        Write-Log "볼륨 설정 실패 — $_" 'WARN'
+    }
+}
+
+# -----------------------------
+# Computer Rename
+# -----------------------------
+if ($EnableComputerRename -and (Confirm-Step -Title '[+] 컴퓨터 이름 변경: VDI-Win11' -Details @(
+    'Rename-Computer -NewName VDI-Win11 -Force',
+    '변경 사항은 재부팅 후 적용됩니다'
+))) {
+    Write-Log 'Renaming computer to VDI-Win11'
+    try {
+        Rename-Computer -NewName 'VDI-Win11' -Force -ErrorAction Stop
+        Write-Log 'Computer renamed to VDI-Win11 (재부팅 후 적용)'
+    } catch {
+        Write-Log "컴퓨터 이름 변경 실패 — $_" 'WARN'
+    }
+}
+
+# -----------------------------
+# Visual Effects Tweak
+# -----------------------------
+if ($EnableVisualEffectsTweak -and (Confirm-Step -Title '[+] 성능 옵션 시각 효과: Custom (4개만 활성화)' -Details @(
+    'VisualFXSetting = 3 (Custom)',
+    '[ON]  바탕 화면 아이콘 레이블 그림자 (ListviewShadow = 1)',
+    '[ON]  아이콘 대신 미리 보기 (IconsOnly = 0)',
+    '[ON]  창 아래에 그림자 표시 (SPI_SETDROPSHADOW)',
+    '[ON]  화면 글꼴 가장자리 다듬기 ClearType (FontSmoothing = 2)',
+    '[OFF] 나머지 모든 애니메이션/전환 효과'
+))) {
+    Write-Log 'Applying custom visual effects (4 items only)'
+
+    Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects' 'VisualFXSetting' 3
+
+    # 애니메이션 전체 비활성화
+    Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' 'TaskbarAnimations'  0
+    Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' 'EnableAeroPeek'     0
+    Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' 'ListviewAlphaSelect' 0
+    if (-not (Test-Path 'HKCU:\Control Panel\Desktop\WindowMetrics')) {
+        New-Item 'HKCU:\Control Panel\Desktop\WindowMetrics' -Force | Out-Null
+    }
+    Set-ItemProperty 'HKCU:\Control Panel\Desktop\WindowMetrics' 'MinAnimate'     '0' -Force
+    Set-ItemProperty 'HKCU:\Control Panel\Desktop'               'DragFullWindows' '0' -Force
+
+    # UserPreferencesMask: Best Performance 기준 (모든 UI 애니메이션 비활성화)
+    $maskBytes = [byte[]]@(0x90, 0x12, 0x01, 0x80, 0x10, 0x00, 0x00, 0x00)
+    Set-ItemProperty 'HKCU:\Control Panel\Desktop' 'UserPreferencesMask' $maskBytes -Type Binary -Force
+
+    # [ON] 바탕 화면 아이콘 레이블 그림자
+    Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' 'ListviewShadow' 1
+    # [ON] 아이콘 대신 미리 보기 (0 = 썸네일 표시)
+    Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' 'IconsOnly' 0
+    # [ON] 화면 글꼴 가장자리 다듬기 (ClearType)
+    Set-ItemProperty 'HKCU:\Control Panel\Desktop' 'FontSmoothing'     '2' -Force
+    Set-ItemProperty 'HKCU:\Control Panel\Desktop' 'FontSmoothingType' '2' -Force
+
+    # [ON] 창 아래에 그림자 표시 — SPI_SETDROPSHADOW (0x1025) 로 설정 및 레지스트리 영속화
+    if (-not ('SpiDropShadow' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class SpiDropShadow {
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool SystemParametersInfo(uint uiAction, uint uiParam, IntPtr pvParam, uint fWinIni);
+}
+'@
+    }
+    # SPIF_UPDATEINIFILE(0x01) | SPIF_SENDCHANGE(0x02) = 0x03 으로 레지스트리에 영속화
+    [SpiDropShadow]::SystemParametersInfo(0x1025, 0, [IntPtr]1, 3) | Out-Null
+
+    Write-Log 'Visual effects applied: 4 items ON, all animations OFF'
+}
+
+# -----------------------------
+# Desktop Icons
+# -----------------------------
+if ($EnableDesktopIcons -and (Confirm-Step -Title '[+] 바탕화면 시스템 아이콘 표시: 내 PC / 제어판' -Details @(
+    '{20D04FE0-3AEA-1069-A2D8-08002B30309D} = 0  (내 PC)',
+    '{5399E694-6CE5-4D6C-8FCE-1D8870FDCBA0} = 0  (제어판)',
+    'HideDesktopIcons\NewStartPanel 레지스트리'
+))) {
+    Write-Log 'Enabling desktop icons: 내 PC, 제어판'
+    $iconRegPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel'
+    if (-not (Test-Path $iconRegPath)) { New-Item $iconRegPath -Force | Out-Null }
+    Set-ItemProperty $iconRegPath '{20D04FE0-3AEA-1069-A2D8-08002B30309D}' 0 -Type DWord -Force
+    Set-ItemProperty $iconRegPath '{5399E694-6CE5-4D6C-8FCE-1D8870FDCBA0}' 0 -Type DWord -Force
+    Write-Log 'Desktop icons set: 내 PC, 제어판'
+}
+
+# -----------------------------
+# Start Menu Pinned Cleanup
+# -----------------------------
+if ($EnableStartMenuPinnedCleanup -and (Confirm-Step -Title '[+] 시작 메뉴 고정 항목 정리 (Edge / 파일 탐색기 / 설정만 유지)' -Details @(
+    'LayoutModification.json 작성',
+    '유지: Microsoft Edge / 파일 탐색기 / 설정',
+    '제거: 나머지 모든 기본 고정 항목',
+    '현재 사용자 및 Default 사용자 프로필 모두 적용'
+))) {
+    Write-Log 'Applying Start Menu pinned layout (Edge, Explorer, Settings only)'
+
+    $layoutJson = '{
+  "pinnedList": [
+    { "desktopAppId": "MSEdge" },
+    { "desktopAppId": "Microsoft.Windows.Explorer" },
+    { "packagedAppId": "windows.immersivecontrolpanel_cw5n1h2txyewy!microsoft.windows.immersivecontrolpanel" }
+  ]
+}'
+
+    # 현재 사용자 (Audit Mode) — CopyProfile 로 Default Profile 에 복사됨
+    $userLayoutDir = "$env:LOCALAPPDATA\Microsoft\Windows\Shell"
+    if (-not (Test-Path $userLayoutDir)) { New-Item $userLayoutDir -ItemType Directory -Force | Out-Null }
+    [System.IO.File]::WriteAllText(
+        "$userLayoutDir\LayoutModification.json",
+        $layoutJson,
+        [System.Text.UTF8Encoding]::new($false)
+    )
+
+    # Default 사용자 프로필 — CopyProfile 미적용 환경 대비 명시적 복사
+    $defaultLayoutDir = 'C:\Users\Default\AppData\Local\Microsoft\Windows\Shell'
+    try {
+        if (-not (Test-Path $defaultLayoutDir)) { New-Item $defaultLayoutDir -ItemType Directory -Force | Out-Null }
+        [System.IO.File]::WriteAllText(
+            "$defaultLayoutDir\LayoutModification.json",
+            $layoutJson,
+            [System.Text.UTF8Encoding]::new($false)
+        )
+        Write-Log 'LayoutModification.json applied to Default user profile'
+    } catch {
+        Write-Log "Default 프로필 적용 실패 (무시) — $_" 'WARN'
+    }
+
+    Write-Log 'Start Menu pinned layout applied'
+}
 
 # -----------------------------
 # Restart stopped services

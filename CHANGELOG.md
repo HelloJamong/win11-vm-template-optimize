@@ -6,6 +6,43 @@
 - `메이저버전`: 프로젝트 기준선 또는 운영 방식이 크게 바뀌는 변경입니다.
 - `마이너버전`: 동일 메이저 기준선 안에서 누적되는 기능/문서/검증 개선 변경입니다.
 
+## [26.1.15] - 2026-04-22
+
+### Added
+
+- `scripts/win11_master_template_optimize.ps1` 시스템 초기 설정 항목 7개 추가 (lite/standard/advanced 전 프로필 적용)
+  - **`EnableControlPanelViewTweak`** — 제어판 보기 기준을 큰 아이콘으로 변경
+    (`AllItemsIconView = 0`, `StartupPage = 1`)
+  - **`EnableBootTimeoutTweak`** — 시작 및 복구 OS 목록 표시 시간 3초 설정
+    (`bcdedit /timeout 3`)
+  - **`EnableSystemVolumeTweak`** — 시스템 기본 볼륨 50% 설정
+    (Windows Core Audio API `IAudioEndpointVolume::SetMasterVolumeLevelScalar`)
+  - **`EnableComputerRename`** — 컴퓨터 이름 `VDI-Win11` 으로 변경
+    (`Rename-Computer -NewName VDI-Win11 -Force`)
+  - **`EnableVisualEffectsTweak`** — 성능 옵션 시각 효과 Custom 설정
+    - 활성화 4개: 바탕 화면 아이콘 레이블 그림자 / 아이콘 대신 미리 보기 / 창 아래 그림자(`SPI_SETDROPSHADOW`) / 화면 글꼴 가장자리 다듬기(ClearType)
+    - 비활성화: 나머지 모든 애니메이션·전환 효과 (`TaskbarAnimations`, `EnableAeroPeek`, `ListviewAlphaSelect`, `MinAnimate`, `DragFullWindows`, `UserPreferencesMask` Best-Performance 기준)
+  - **`EnableDesktopIcons`** — 바탕화면에 내 PC / 제어판 시스템 아이콘 표시
+    (`HideDesktopIcons\NewStartPanel` CLSID 레지스트리)
+  - **`EnableStartMenuPinnedCleanup`** — 시작 메뉴 고정 항목을 Edge·파일 탐색기·설정만 남기고 모두 제거
+    (`LayoutModification.json` 현재 사용자 및 Default 사용자 프로필 양쪽 적용)
+
+### Changed
+
+- `scripts/win11_master_template_optimize.ps1` `$DefaultAppxPatterns` 대폭 확장
+  - 별도 설치하지 않은 MS 기본 앱 전체를 Standard 이상에서 제거하도록 하드코드 목록 확장.
+  - 신규 추가: `*OutlookForWindows*` / `*Todos*` / `*PowerAutomateDesktop*` / `*MicrosoftOfficeHub*` /
+    `*WindowsCommunicationsApps*` / `*WindowsCamera*` / `*WindowsSoundRecorder*` /
+    `*MicrosoftStickyNotes*` / `*WindowsAlarms*` / `*SkypeApp*` / `*OneNote*` /
+    `*DevHome*` / `*QuickAssist*` / `*549981C3F5F10*`(Cortana)
+  - 기존 항목 유지, 카테고리 주석 추가.
+
+### Verification
+
+- 7개 신규 플래그 lite/standard/advanced 프로필 모두 등록 확인
+- `EnableDesktopIcons` / `EnableStartMenuPinnedCleanup` lite 포함 전 프로필 `$true` 확인
+- `$DefaultAppxPatterns` 신규 항목 및 카테고리 주석 확인
+
 ## [26.1.14] - 2026-04-22
 
 ### Fixed
