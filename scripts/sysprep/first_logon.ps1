@@ -140,6 +140,37 @@ if ($DriveReady) {
             Write-Log "리디렉션 실패: $($r.Key) — $_" 'WARN'
         }
     }
+
+    # Desktop Known Folder 경로 동기화 (탐색기 네비게이션 패널 복구)
+    #
+    # User Shell Folders 레지스트리 변경은 파일 라우팅에는 충분하지만,
+    # 탐색기 좌측 패널은 Known Folder 캐시(SHGetKnownFolderPath)를 사용합니다.
+    # Desktop은 Shell 네임스페이스 루트와 연결되어 있어 다른 폴더와 달리
+    # SHSetKnownFolderPath API 호출 없이는 패널에서 사라지는 Windows 동작이 있습니다.
+    if (-not ('KnownFolderHelper' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class KnownFolderHelper {
+    [DllImport("shell32.dll")]
+    public static extern int SHSetKnownFolderPath(
+        ref Guid rfid, uint dwFlags, IntPtr hToken,
+        [MarshalAs(UnmanagedType.LPWStr)] string pszPath);
+}
+'@
+    }
+    try {
+        $desktopGuid = [Guid]::new('B4BFCC3A-DB2C-424C-B029-7FE99A87C641')
+        $desktopPath = Join-Path $DataRoot 'Desktop'
+        $hr = [KnownFolderHelper]::SHSetKnownFolderPath([ref]$desktopGuid, 0, [IntPtr]::Zero, $desktopPath)
+        if ($hr -eq 0) {
+            Write-Log "Desktop Known Folder 경로 업데이트 완료: $desktopPath" 'INFO'
+        } else {
+            Write-Log "Desktop Known Folder 업데이트 실패 (HRESULT: 0x$($hr.ToString('X8')))" 'WARN'
+        }
+    } catch {
+        Write-Log "Desktop Known Folder 업데이트 예외: $_" 'WARN'
+    }
 }
 
 # ──────────────────────────────────────────────────────────────────────

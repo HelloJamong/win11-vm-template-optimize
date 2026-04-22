@@ -6,6 +6,45 @@
 - `메이저버전`: 프로젝트 기준선 또는 운영 방식이 크게 바뀌는 변경입니다.
 - `마이너버전`: 동일 메이저 기준선 안에서 누적되는 기능/문서/검증 개선 변경입니다.
 
+## [26.1.14] - 2026-04-22
+
+### Fixed
+
+- `scripts/win11_master_template_optimize.ps1` configs 경로 탐색 오류 수정
+  - 배포 환경(스크립트가 루트에 위치)에서 `configs/` 폴더를 찾지 못하는 문제 수정.
+  - 원인: `$Script:RootDir = Split-Path -Parent $PSScriptRoot` 는 개발 환경(`scripts/` 하위 실행) 기준 설계.
+    릴리즈 ZIP에서 스크립트를 루트에서 실행 시 `configs/`를 한 단계 위 경로에서 탐색해 경로가 틀어짐.
+  - 수정: 스크립트와 동일 레벨에 `configs/`가 있으면 그 경로를 우선 사용하고,
+    없으면 부모 디렉터리에서 탐색하는 폴백 로직 추가. 개발/배포 환경 모두 대응.
+- `.github/workflows/release.yml` 릴리즈 ZIP에 `configs/` 폴더 누락 수정
+  - `appx-remove-list.txt`, `services-disable-list.txt`, `tasks-disable-list.txt` 를
+    `_release/configs/` 에 포함하도록 추가.
+
+### Verification
+
+- 배포 환경(루트 실행) 경로 폴백 로직 확인
+- 개발 환경(`scripts/` 하위 실행) 기존 동작 유지 확인
+- 릴리즈 ZIP `configs/` 디렉터리 구조 확인
+
+## [26.1.13] - 2026-04-22
+
+### Fixed
+
+- `scripts/sysprep/first_logon.ps1` Desktop 탐색기 네비게이션 패널 누락 수정
+  - 쉘 폴더 리디렉션 후 파일 탐색기 좌측 패널에서 Desktop이 사라지는 문제 수정.
+  - 원인: `User Shell Folders` 레지스트리 변경은 파일 라우팅에는 충분하지만,
+    탐색기 네비게이션 패널은 Known Folder 캐시(`SHGetKnownFolderPath`)를 참조합니다.
+    Desktop은 Shell 네임스페이스 루트와 연결되어 있어 Documents/Downloads 등과 달리
+    `SHSetKnownFolderPath` API 호출 없이는 패널에서 사라지는 Windows 동작이 있습니다.
+  - 수정: 리디렉션 루프 직후 `SHSetKnownFolderPath` P/Invoke로 Desktop Known Folder
+    경로(`{B4BFCC3A-DB2C-424C-B029-7FE99A87C641}`)를 `D:\UserData\{사용자명}\Desktop`으로 동기화.
+  - D 드라이브가 없는 환경에서는 호출하지 않습니다 (`$DriveReady` 조건 유지).
+
+### Verification
+
+- `first_logon.ps1` `SHSetKnownFolderPath` P/Invoke 코드 삽입 위치 확인
+- D 드라이브 없는 환경 분기(`$DriveReady`) 유지 확인
+
 ## [26.1.12] - 2026-04-22
 
 ### Fixed
