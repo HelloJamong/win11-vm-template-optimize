@@ -6,6 +6,22 @@
 - `메이저버전`: 프로젝트 기준선 또는 운영 방식이 크게 바뀌는 변경입니다.
 - `마이너버전`: 동일 메이저 기준선 안에서 누적되는 기능/문서/검증 개선 변경입니다.
 
+## [26.1.11] - 2026-04-22
+
+### Fixed
+
+- `scripts/sysprep/build-unattend-iso.ps1` 인코딩 수정
+  - UTF-8 without BOM → UTF-8 with BOM 으로 변경.
+  - Windows PowerShell 5.x 에서 한글 출력 깨짐 및 `TerminatorExpectedAtEndOfString` 파싱 오류 수정.
+- `scripts/build-vm-optimize-iso.ps1` 인코딩 수정
+  - UTF-8 without BOM → UTF-8 with BOM 으로 변경.
+  - Windows PowerShell 5.x 에서 한글 출력 깨짐 및 `TerminatorExpectedAtEndOfString` 파싱 오류 수정.
+
+### Verification
+
+- `build-unattend-iso.ps1` UTF-8 BOM(`EF BB BF`) 적용 확인
+- `build-vm-optimize-iso.ps1` UTF-8 BOM(`EF BB BF`) 적용 확인
+
 ## [26.1.10] - 2026-04-21
 
 ### Added
