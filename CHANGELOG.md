@@ -6,6 +6,33 @@
 - `메이저버전`: 프로젝트 기준선 또는 운영 방식이 크게 바뀌는 변경입니다.
 - `마이너버전`: 동일 메이저 기준선 안에서 누적되는 기능/문서/검증 개선 변경입니다.
 
+## [26.1.19] - 2026-04-24
+
+### Added
+
+- `scripts/win11_master_template_optimize.ps1` 프로그램 설치/오류 보고 잔여물 정리 옵션 추가
+  - **`EnableInstallerResidueCleanup`** 기본값 `true` 추가
+  - `C:\Windows\Installer\$PatchCache$` 정리
+  - `C:\ProgramData\Package Cache` 정리
+  - `C:\ProgramData\Microsoft\Windows\WER` 정리
+  - `C:\Users\*\AppData\Local\Package Cache` 정리
+  - `C:\Users\*\AppData\Local\Microsoft\Windows\WER` 정리
+
+### Changed
+
+- `scripts/win11_master_template_optimize.ps1` 설치/배포 로그 정리 기본값 변경
+  - **`EnableSetupLogCleanup`** 기본값을 `false` → `true`로 변경
+  - 최종 봉인 직전 템플릿 흔적 최소화 목적을 주석에 명시
+  - Sysprep/Setup 문제 분석이 필요한 검증 단계에서는 `false`로 되돌리도록 안내
+- 임시 파일 및 캐시 정리 단계에서 기능별 옵션 경계를 정리
+  - Temp 정리, 설치 잔여물 정리, Setup 로그 정리, Downloads/Desktop 정리가 각각 해당 `$Enable*` 옵션을 따르도록 조건 분리
+
+### Verification
+
+- `git diff --check` 통과
+- `EnableInstallerResidueCleanup` 기본값 및 요청 경로 5개 반영 확인
+- `EnableSetupLogCleanup` 기본값 `true` 및 주석 변경 확인
+
 ## [26.1.18] - 2026-04-24
 
 ### Changed
