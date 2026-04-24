@@ -106,7 +106,7 @@ win11-vm-template-optimize/
 6. 필요한 프로그램 설치 및 설정
 7. `win11_master_template_optimize.ps1` 실행
 8. `sdelete64 -z C:` 실행 → VM 종료
-9. diskpart 또는 VBoxManage로 VDI compact
+9. diskpart로 VDI compact
 
 ## 7. 주의사항
 
@@ -120,32 +120,6 @@ win11-vm-template-optimize/
 
 ## 8. 참고 프로젝트 및 라이선스
 
-이 저장소의 코드는 자체 작성되었으며, 저장소 자체 코드에는 MIT License를 적용합니다. 다음 프로젝트는 아이디어, 구성 방식, 최적화 방향을 참고했습니다.
+참고 프로젝트, 라이선스, 고지 사항은 **[`NOTICE.md`](NOTICE.md)** 를 참조하십시오.
 
-### MIT 라이선스 프로젝트 참고
-
-- Win11Debloat: [프로젝트 바로가기](https://github.com/Raphire/Win11Debloat)
-  - 라이선스: MIT License
-  - 참고 범위: Windows 10/11 불필요 앱 제거, 개인정보/소비자 기능 조정 방향
-  - 본 저장소에는 원본 소스를 그대로 포함하지 않습니다.
-- WinUtil: [프로젝트 바로가기](https://github.com/ChrisTitusTech/winutil)
-  - 라이선스: MIT License
-  - 참고 범위: Windows 최적화 옵션 분류, 사용자 선택형 튜닝 구성 방식
-  - 본 저장소에는 원본 소스를 그대로 포함하지 않습니다.
-
-### 개념 참고
-
-- Virtual-Desktop-Optimization-Tool: [프로젝트 바로가기](https://github.com/The-Virtual-Desktop-Team/Virtual-Desktop-Optimization-Tool)
-  - 참고 범위: 가상 데스크톱/VDI 환경에서 성능 관련 설정을 분류하고 적용하는 운영 개념
-  - 직접 코드, 설정 파일, 원본 스크립트는 포함하지 않습니다.
-
-자세한 고지는 `NOTICE.md`를 참조하십시오. 운영 절차는 `docs/guide.md`를 기준으로 관리합니다.
-
-## 9. 향후 계획
-
-- Windows 11 버전별 Appx 제거 영향도 매트릭스 작성
-- Sysprep 실패 사례와 조치 가이드 확장
-- 오프라인/망분리 환경용 패키지 반입 기준 문서 보강
-- PowerShell Pester 기반 정적 검증 테스트 추가
-- VHD 후처리 절차와 조직 표준 보관 검증 문서 보강
-- `CHANGELOG.md` 기반 릴리스 노트 운영
+운영 절차는 **[`docs/guide.md`](docs/guide.md)** 를 기준으로 관리합니다.
