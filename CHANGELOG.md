@@ -6,6 +6,29 @@
 - `메이저버전`: 프로젝트 기준선 또는 운영 방식이 크게 바뀌는 변경입니다.
 - `마이너버전`: 동일 메이저 기준선 안에서 누적되는 기능/문서/검증 개선 변경입니다.
 
+## [26.1.17] - 2026-04-24
+
+### Changed
+
+- `docs/guide.md` 작업 절차 전면 재구성
+  - 기존 흐름(Audit Mode → 최적화 → Sysprep → 최초 로그인 → 후처리)을
+    신규 흐름(Audit Mode → Sysprep 파일 배치 → Sysprep → 부팅 → 프로그램 설치 → 최적화 → sdelete → VDI compact)으로 변경
+  - 섹션 순서 재배치 및 번호 재정렬 (총 15개 섹션)
+  - 최적화 스크립트 실행 명령에서 `--standard` 옵션 제거
+  - 모드 선택 기준 표(`--lite` / `--standard` / `--advanced`) 제거
+  - VDI compact 섹션에 diskpart(`compact vdisk`) 및 VBoxManage 양쪽 방법 추가
+  - 최적화 후 체크리스트 항목(sdelete 완료, VDI compact 완료) 추가
+- `README.md` 문서 간소화 및 가이드 링크로 대체
+  - 섹션 6 (사용 흐름) 상세 절차 제거 → `docs/guide.md` 링크 및 9단계 요약으로 대체
+  - 섹션 7 (스크립트 모드 설명 — `--lite` / `--standard` / `--advanced`) 전체 제거
+  - 섹션 번호 재정렬 (8→7, 9→8, 10→9)
+  - 섹션 1, 3에서 모드 옵션 관련 언급 제거
+  - `build-vm-optimize-iso.ps1` 디렉터리 구조에 추가
+
+### Verification
+
+- `docs/guide.md` 및 `README.md` 내 `--lite` / `--standard` / `--advanced` 참조 전체 제거 확인
+
 ## [26.1.16] - 2026-04-24
 
 ### Added
