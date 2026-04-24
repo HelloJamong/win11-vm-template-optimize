@@ -6,6 +6,48 @@
 - `메이저버전`: 프로젝트 기준선 또는 운영 방식이 크게 바뀌는 변경입니다.
 - `마이너버전`: 동일 메이저 기준선 안에서 누적되는 기능/문서/검증 개선 변경입니다.
 
+## [26.1.16] - 2026-04-24
+
+### Added
+
+- `scripts/win11_master_template_optimize.ps1` Windows 설정 항목 5개 추가 (standard 적용)
+  - **`EnableSignInOptionsTweak`** — 업데이트/재시작 후 자동 설정 완료(ARSO) 비활성화
+    (`HKLM:\...\System` `DisableAutomaticRestartSignOn = 1`)
+  - **`EnableTaskbarEndTaskTweak`** — 작업 표시줄 우클릭 메뉴 작업 종료 버튼 활성화
+    (`HKCU:\...\TaskbarDeveloperSettings` `TaskbarEndTask = 1`)
+  - **`EnableAppRestartTweak`** — 로그인 시 앱 자동 재시작 비활성화
+    (`HKCU:\...\Winlogon` `RestartApps = 0`)
+  - **`EnableStartPersonalizationTweak`** — 개인설정 > 시작 항목 조정
+    - 팁/바로가기/새 앱 권장 사항 끔 (`Start_IrisRecommendations = 0`)
+    - 계정 관련 알림 끔 (`Start_AccountNotifications = 0`)
+    - 전원 버튼 옆 폴더: 설정·파일 탐색기·다운로드 활성화, 나머지 비활성화
+  - **`EnablePrivacyGeneralTweak`** — 개인정보 및 보안 > 일반/권장 사항 조정
+    - 웹 사이트 언어 목록 접근 차단 (`HttpAcceptLanguageOptOut = 1`)
+    - 설정 앱 알림 끔 (`EnableAccountNotifications = 0`)
+    - 장치 검색 기록 비활성화 (`IsDeviceSearchHistoryEnabled = 0`) 및 초기화 (`Search\RecentApps` 삭제)
+
+### Changed
+
+- `scripts/win11_master_template_optimize.ps1` 모드 시스템 단일화
+  - `--lite` / `--advanced` 모드 제거, 인수 없이 실행 시 standard 설정으로 동작
+  - `Apply-ModePreset` 함수, `Show-Usage` 함수, 인수 파싱 블록 제거 (89줄 감소)
+  - 상단 `$Enable*` 플래그 직접 수정으로 개별 항목 제어 방식 유지
+- `scripts/build-vm-optimize-iso.ps1` ISO 빌드 시 파일 자동 포함
+  - `win11_master_template_optimize.ps1` → `_iso/` 자동 복사
+  - `configs/` 폴더 → `_iso/configs/` 자동 복사
+  - `sdelete64.exe`는 기존과 동일하게 수동 배치
+
+### Removed
+
+- `--lite` 모드 (보수적/저위험 모드) 삭제
+- `--advanced` 모드 전용 항목 삭제: 페이지파일 삭제, CompactOS, 선택적 기능 비활성화, 다운로드/바탕화면 정리, 설치 로그 정리
+
+### Verification
+
+- 신규 플래그 5개 기본값·standard·advanced 프리셋 위치 확인
+- 모드 관련 참조(`Apply-ModePreset`, `SelectedMode`, `--lite`, `--advanced`) 전체 제거 확인
+- `build-vm-optimize-iso.ps1` 자동 복사 경로(`$PSScriptRoot`, `$repoRoot`) 확인
+
 ## [26.1.15] - 2026-04-22
 
 ### Added

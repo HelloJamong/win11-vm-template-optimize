@@ -114,42 +114,62 @@ function New-IsoFromDirectory {
     }
 }
 
-# ── 안내 메세지 ────────────────────────────────────────────────
+# ── 경로 설정 ─────────────────────────────────────────────────
 
-$isoSourceDir = Join-Path $PSScriptRoot '_iso'
+$isoSourceDir  = Join-Path $PSScriptRoot '_iso'
+$repoRoot      = Split-Path $PSScriptRoot -Parent
+$mainScript    = Join-Path $PSScriptRoot 'win11_master_template_optimize.ps1'
+$configsSrc    = Join-Path $repoRoot 'configs'
+
+# ── 안내 메세지 ────────────────────────────────────────────────
 
 Write-Host ''
 Write-Host ('=' * 60) -ForegroundColor DarkCyan
 Write-Host '  VM Optimize ISO 생성기' -ForegroundColor Cyan
 Write-Host ('=' * 60) -ForegroundColor DarkCyan
 Write-Host ''
-Write-Host '  ISO에 포함할 파일을 다음 폴더에 배치하십시오:' -ForegroundColor White
+Write-Host '  다음 파일은 자동으로 _iso 폴더에 복사됩니다:' -ForegroundColor White
+Write-Host '    - win11_master_template_optimize.ps1' -ForegroundColor Gray
+Write-Host '    - configs\ (appx / services / tasks 목록)' -ForegroundColor Gray
+Write-Host ''
+Write-Host '  sdelete64.exe는 수동으로 아래 폴더에 배치하십시오:' -ForegroundColor White
 Write-Host "  $isoSourceDir" -ForegroundColor Yellow
 Write-Host ''
-Write-Host '  배치 파일 예시:' -ForegroundColor Gray
-Write-Host '    - win11_master_template_optimize.ps1' -ForegroundColor Gray
-Write-Host '    - sdelete64.exe' -ForegroundColor Gray
-Write-Host ''
 
-$answer = Read-Host '  파일을 배치했습니까? 계속하시겠습니까? [Y/n]'
+$answer = Read-Host '  계속하시겠습니까? [Y/n]'
 
 if ($answer -notmatch '^[Yy]$' -and $answer -ne '') {
     Write-Warn '취소되었습니다.'
     exit 0
 }
 
-# ── 유효성 검사 ───────────────────────────────────────────────
+# ── 파일 자동 복사 ────────────────────────────────────────────
 
 if (-not (Test-Path -LiteralPath $isoSourceDir)) {
-    Write-Err "_iso 폴더가 존재하지 않습니다: $isoSourceDir"
-    Write-Err "위 경로에 _iso 폴더를 생성하고 파일을 배치한 뒤 다시 실행하십시오."
-    exit 1
+    New-Item -ItemType Directory -Path $isoSourceDir -Force | Out-Null
+    Write-Info "_iso 폴더를 생성했습니다: $isoSourceDir"
 }
 
-$sourceFiles = Get-ChildItem -LiteralPath $isoSourceDir -File -ErrorAction SilentlyContinue
+if (-not (Test-Path -LiteralPath $mainScript)) {
+    Write-Err "메인 스크립트를 찾을 수 없습니다: $mainScript"
+    exit 1
+}
+Copy-Item -LiteralPath $mainScript -Destination $isoSourceDir -Force
+Write-Info "복사 완료: win11_master_template_optimize.ps1"
+
+if (-not (Test-Path -LiteralPath $configsSrc)) {
+    Write-Err "configs 폴더를 찾을 수 없습니다: $configsSrc"
+    exit 1
+}
+$configsDst = Join-Path $isoSourceDir 'configs'
+Copy-Item -LiteralPath $configsSrc -Destination $configsDst -Recurse -Force
+Write-Info "복사 완료: configs\"
+
+# ── 유효성 검사 ───────────────────────────────────────────────
+
+$sourceFiles = Get-ChildItem -LiteralPath $isoSourceDir -Recurse -File -ErrorAction SilentlyContinue
 if ($sourceFiles.Count -eq 0) {
     Write-Err "_iso 폴더가 비어 있습니다: $isoSourceDir"
-    Write-Err "ISO에 포함할 파일을 _iso 폴더에 배치한 뒤 다시 실행하십시오."
     exit 1
 }
 
@@ -163,7 +183,10 @@ if (-not (Test-Path -LiteralPath $outputDirectory)) {
 
 Write-Host ''
 Write-Info "포함 파일 목록:"
-$sourceFiles | ForEach-Object { Write-Info "  - $($_.Name)" }
+$sourceFiles | ForEach-Object {
+    $rel = $_.FullName.Substring($isoSourceDir.Length + 1)
+    Write-Info "  - $rel"
+}
 Write-Info "출력 ISO: $outputFullPath"
 Write-Info "볼륨 이름: $VolumeName"
 
