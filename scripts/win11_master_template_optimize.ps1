@@ -389,6 +389,60 @@ function Set-RegDword {
 # 정책/설정을 레지스트리에 DWORD로 기록합니다.
 # 값 수정 시 기능 비활성/활성 정책이 바뀝니다.
 
+function Set-RegBinary {
+    param(
+        [string]$Path,
+        [string]$Name,
+        [byte[]]$Value
+    )
+
+    try {
+        if (-not (Test-Path -Path $Path)) {
+            New-Item -Path $Path -Force | Out-Null
+        }
+        New-ItemProperty -Path $Path -Name $Name -PropertyType Binary -Value $Value -Force | Out-Null
+        Write-Log "Registry set: $Path -> $Name = REG_BINARY ($($Value.Length) bytes)"
+    }
+    catch {
+        Write-Log "Registry binary set failed: $Path -> $Name" 'WARN'
+    }
+}
+# REG_BINARY 기반 사용자 설정을 기록합니다.
+# Windows 11 시작 메뉴 폴더(VisiblePlaces)처럼 GUID 목록을 바이너리로 저장하는 값에 사용합니다.
+
+function Set-StartVisiblePlaces {
+    $startPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Start'
+
+    $visiblePlaceGuids = @(
+        '52730886-51AA-4243-9F7B-2776584659D4', # 설정
+        '148A24BC-D60C-4289-A080-6ED9BBA24882', # 파일 탐색기
+        'E367B32F-89DE-4355-BFCE-61F37B18A937'  # 다운로드
+    )
+
+    $visiblePlacesBytes = foreach ($guid in $visiblePlaceGuids) {
+        ([Guid]$guid).ToByteArray()
+    }
+
+    Set-RegBinary $startPath 'VisiblePlaces' ([byte[]]$visiblePlacesBytes)
+
+    # 이전 구현에서 사용하던 Show* DWORD 값은 Windows 11의 실제 폴더 표시 값이 아니므로
+    # 재실행 시 혼동되지 않도록 제거합니다. 폴더 표시는 VisiblePlaces 하나로 고정합니다.
+    @(
+        'ShowSettings',
+        'ShowFileExplorer',
+        'ShowDownloads',
+        'ShowPersonalFolder',
+        'ShowDocuments',
+        'ShowMusic',
+        'ShowPictures',
+        'ShowVideos',
+        'ShowNetwork'
+    ) | ForEach-Object {
+        Remove-ItemProperty -Path $startPath -Name $_ -ErrorAction SilentlyContinue
+    }
+}
+# 개인설정 > 시작 > 폴더 항목을 설정/파일 탐색기/다운로드 3개만 표시하도록 고정합니다.
+
 function Remove-RegistryKeySafe {
     param([string]$Path)
 
@@ -1182,18 +1236,9 @@ if ($EnableStartPersonalizationTweak -and (Confirm-Step -Title '[+] 개인설정
     Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' 'Start_IrisRecommendations' 0
     Set-RegDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' 'Start_AccountNotifications' 0
 
-    $startPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Start'
-    Set-RegDword $startPath 'ShowSettings'      1
-    Set-RegDword $startPath 'ShowFileExplorer'  1
-    Set-RegDword $startPath 'ShowDownloads'     1
-    Set-RegDword $startPath 'ShowPersonalFolder' 0
-    Set-RegDword $startPath 'ShowDocuments'     0
-    Set-RegDword $startPath 'ShowMusic'         0
-    Set-RegDword $startPath 'ShowPictures'      0
-    Set-RegDword $startPath 'ShowVideos'        0
-    Set-RegDword $startPath 'ShowNetwork'       0
+    Set-StartVisiblePlaces
 }
-# 팁/계정 알림 차단, 전원 버튼 옆 폴더를 설정/탐색기/다운로드 3개로 고정합니다.
+# 팁/계정 알림 차단, 전원 버튼 옆 폴더를 VisiblePlaces 기준 설정/탐색기/다운로드 3개로 고정합니다.
 
 # -----------------------------
 # Taskbar / Notification Tweaks

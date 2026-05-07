@@ -6,6 +6,21 @@
 - `메이저버전`: 프로젝트 기준선 또는 운영 방식이 크게 바뀌는 변경입니다.
 - `마이너버전`: 동일 메이저 기준선 안에서 누적되는 기능/문서/검증 개선 변경입니다.
 
+## [26.1.20] - 2026-05-07
+
+### Changed
+
+- `EnableStartPersonalizationTweak`의 시작 메뉴 폴더 표시 설정을 Windows 11 `VisiblePlaces` `REG_BINARY` 방식으로 변경
+  - 설정 / 파일 탐색기 / 다운로드 GUID만 기록하도록 수정
+  - 기존 `ShowSettings`, `ShowFileExplorer`, `ShowDownloads` 등 `Show*` DWORD 작성 방식 제거
+- 이 설정은 `win11_master_template_optimize.ps1` 실행 계정의 HKCU에만 적용되도록 유지
+
+### Verification
+
+- `VisiblePlaces` GUID 3개가 설정 / 파일 탐색기 / 다운로드와 일치함을 확인
+- `git diff --check` 통과
+- PowerShell 파서 검증은 현재 실행 환경에 `pwsh`/`powershell`이 없어 미수행
+
 ## [26.1.19] - 2026-04-24
 
 ### Added
