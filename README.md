@@ -72,7 +72,7 @@ win11-vm-template-optimize/
 ├─ docs/
 │  └─ guide.md
 ├─ scripts/
-│  ├─ win11_master_template_optimize.ps1   ← Audit Mode 최적화 (단일 스크립트)
+│  ├─ win11_master_template_optimize.ps1   ← 설치 완료 후 최적화 (단일 스크립트)
 │  ├─ build-vm-optimize-iso.ps1            ← VM_optimize ISO 생성 도구
 │  └─ sysprep/
 │     ├─ unattend.xml                      ← Sysprep 응답 파일 (CopyProfile=true)
@@ -88,7 +88,7 @@ win11-vm-template-optimize/
 
 - `CHANGELOG.md`: 연도.메이저버전.마이너버전 형식의 공식 변경 이력
 - `docs/guide.md`: 템플릿 생성, 정리 항목, Sysprep, 감사 대응을 통합한 운영 가이드
-- `scripts/win11_master_template_optimize.ps1`: Audit Mode에서 실행하는 단일 최적화 스크립트
+- `scripts/win11_master_template_optimize.ps1`: 계정 생성 및 프로그램 설치 완료 후 로그인 상태에서 실행하는 단일 최적화 스크립트
 - `scripts/sysprep/`: Sysprep 응답 파일, 최초 로그인 스크립트, ISO 생성 도구 모음
 - `configs/`: 제거/비활성화 후보 목록 및 정책 레지스트리 설명
 

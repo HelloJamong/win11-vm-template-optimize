@@ -6,6 +6,65 @@
 - `메이저버전`: 프로젝트 기준선 또는 운영 방식이 크게 바뀌는 변경입니다.
 - `마이너버전`: 동일 메이저 기준선 안에서 누적되는 기능/문서/검증 개선 변경입니다.
 
+## [26.1.22] - 2026-05-07
+
+### Added
+
+- `scripts/win11_master_template_optimize.ps1` `-NonInteractive` 스위치 추가
+  - `param([switch]$NonInteractive)` 블록을 파일 선두에 추가
+  - `-NonInteractive` 지정 시 모든 단계를 사용자 확인 없이 자동 진행 (`$Script:Interactive = -not $NonInteractive`)
+  - 기존 대화형 동작(기본값)은 변경 없음
+- `scripts/win11_master_template_optimize.ps1` `$NewComputerName` 변수 추가
+  - `$EnableComputerRename` 옆에 `$NewComputerName = 'VDI-Win11'` 변수 선언
+  - 컴퓨터 이름 변경 시 코드 내부를 찾지 않고 Options 섹션 상단에서 일괄 관리
+
+### Changed
+
+- `scripts/win11_master_template_optimize.ps1` 전역 `$ErrorActionPreference` 제거
+  - `$ErrorActionPreference = 'SilentlyContinue'` 전역 설정 제거
+  - 모든 함수 내부에 `-ErrorAction SilentlyContinue`가 개별 지정되어 있어 동작 변화 없음
+  - 의도치 않은 오류까지 무음 처리하던 전역 설정 제거로 문제 추적 용이성 향상
+- `scripts/win11_master_template_optimize.ps1` 하드코딩 경로 → 환경변수 교체
+  - Defender 정리 경로: `'C:\ProgramData\...'` → `"$env:ProgramData\..."`
+  - Default 사용자 프로필 경로: `'C:\Users\Default\...'` → `"$env:SystemDrive\Users\Default\..."`
+  - SystemDrive가 C: 가 아닌 환경에서도 정상 동작하도록 개선
+- `scripts/win11_master_template_optimize.ps1` deprecated `wmic` → CIM cmdlet 교체
+  - `wmic computersystem ... set AutomaticManagedPagefile=False` → `Get-CimInstance Win32_ComputerSystem | Set-CimInstance -Property @{ AutomaticManagedPagefile = $false }`
+  - `wmic pagefileset ... delete` → `Get-CimInstance Win32_PageFileSetting | Remove-CimInstance`
+  - `wmic`는 Windows 10 21H1 / Windows 11부터 공식 deprecated. 동일 WMI 인프라(`Win32_ComputerSystem`, `Win32_PageFileSetting`) 사용으로 기능 동일성 100% 유지
+- `scripts/win11_master_template_optimize.ps1` 컴퓨터 이름 변경 로직 변수화
+  - `Rename-Computer -NewName 'VDI-Win11'` → `Rename-Computer -NewName $NewComputerName` 으로 교체
+  - Confirm-Step 타이틀에 `$NewComputerName` 값 표시
+- `scripts/win11_master_template_optimize.ps1` ContentDeliveryManager 중복 키 정리
+  - `338388Enabled`, `338389Enabled`: EnableStartMenuTweaks에서 제거 → EnableConsumerTweaks 단독 소유
+  - `353694Enabled`, `353696Enabled`: EnableTaskbarAndNotificationTweaks에서 제거 → EnableConsumerTweaks 단독 소유
+  - `SoftLandingEnabled`: EnableLockScreenContentTweaks에서 제거 → EnableConsumerTweaks 단독 소유
+  - 각 섹션의 Confirm-Step Details 메시지도 동기화
+- `scripts/win11_master_template_optimize.ps1` 단계 번호 통일
+  - `[1/14]`~`[14/14]` + `[+]` 혼재 → `[1/41]`~`[41/41]` 전 단계 일관 적용
+- `scripts/win11_master_template_optimize.ps1` `Start-Process` 인자 전달 방식 개선
+  - `Start-Process dism.exe $dismArgs`: 문자열 단일 인자 → `$dismArgs = @('/online', '/cleanup-image', '/startcomponentcleanup')` 배열 + `-ArgumentList $dismArgs`
+  - `Start-Process bcdedit.exe '/timeout 3'` → `-ArgumentList '/timeout', '3'`
+  - `Start-Process defrag.exe "$env:SystemDrive /X /U /V"` → `-ArgumentList $env:SystemDrive, '/X', '/U', '/V'`
+  - PowerShell 버전 무관하게 인자 경계가 명확한 배열 형태로 통일
+- `README.md` 스크립트 실행 맥락 설명 수정
+  - 디렉터리 구조 레이블: `← Audit Mode 최적화 (단일 스크립트)` → `← 설치 완료 후 최적화 (단일 스크립트)`
+  - 스크립트 설명: Audit Mode 실행 → 계정 생성 및 프로그램 설치 완료 후 로그인 상태에서 실행으로 수정
+- `docs/guide.md` 섹션 10 (최적화 스크립트 실행) 전면 재작성
+  - 현재 로그인된 계정으로 관리자 PowerShell에서 실행하는 것으로 명시
+  - `-NonInteractive` 사용 예시 추가
+  - `$NewComputerName`, `$EnableComputerRename` 등 실행 전 확인 항목 표로 정리
+  - 전체 41개 단계 `[N/41]` 형식 설명 추가
+  - ZIP 구조 레이블 수정: `← Audit Mode 최적화 스크립트` → `← 설치 완료 후 최적화 스크립트`
+
+### Verification
+
+- 변경 대상 3개 파일 (`win11_master_template_optimize.ps1`, `README.md`, `docs/guide.md`) diff 확인
+- `[+]` 단계 표기 잔존 여부 확인 (실행 코드 내 미존재 확인)
+- `wmic` 참조 잔존 여부 확인 (제거 완료)
+- `Start-Process` `-ArgumentList` 배열 형태 적용 3개소 확인
+- PowerShell 파서 검증은 현재 실행 환경에 `pwsh`/`powershell`이 없어 미수행
+
 ## [26.1.20] - 2026-05-07
 
 ### Changed
