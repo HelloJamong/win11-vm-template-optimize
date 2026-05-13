@@ -6,6 +6,41 @@
 - `메이저버전`: 프로젝트 기준선 또는 운영 방식이 크게 바뀌는 변경입니다.
 - `마이너버전`: 동일 메이저 기준선 안에서 누적되는 기능/문서/검증 개선 변경입니다.
 
+## [26.2.0] - 2026-05-14
+
+### Added
+
+- `docs/optimize-steps.md` 신규 작성
+  - `win11_master_template_optimize.ps1` 실행 시 처리되는 44개 단계 전체를 9개 범주로 정리
+  - 각 항목마다 기본 활성/비활성 여부(✅/⬜), 주요 처리 내용(레지스트리 키·경로·명령어) 기재
+  - 기본 비활성 항목 5종 요약 테이블 포함
+- `scripts/win11_master_template_optimize.ps1` NetBIOS over TCP/IP 비활성화 단계 추가 (`[12/44]`)
+  - 옵션 변수: `$EnableNetBiosDisable = $true`
+  - IP 활성 어댑터 전체에 `SetTCPIPNetBIOS(2)` 적용 (WMI CIM 방식)
+  - WINS/NetBIOS 기반 이름 해석이 필요한 환경 대비 false 전환 안내 주석 포함
+- `scripts/win11_master_template_optimize.ps1` NetBIOS 포트 인바운드 방화벽 차단 단계 추가 (`[13/44]`)
+  - 옵션 변수: `$EnableNetBiosFirewallBlock = $true`
+  - `137/UDP`(NBNS), `138/UDP`(Datagram), `139/TCP`(Session) 인바운드 차단
+  - `New-NetFirewallRule` 기반, 모든 프로필 적용, 중복 규칙 생성 방지 포함
+  - 12단계 NetBIOS 비활성화와 이중 차단 구성
+- `scripts/win11_master_template_optimize.ps1` SMB 포트 인바운드 방화벽 차단 단계 추가 (`[14/44]`)
+  - 옵션 변수: `$EnableSmbFirewallBlock = $true`
+  - `445/TCP`(SMB Direct) 인바운드 차단, 모든 프로필 적용
+  - Confirm-Step Details에 도메인 가입·파일 서버 환경 경고 명시
+  - WannaCry/NotPetya 류 SMB 기반 전파 경로 차단 목적
+
+### Changed
+
+- `scripts/win11_master_template_optimize.ps1` 전체 단계 수 41 → 44로 재번호
+  - 신규 3개 단계(12~14) 삽입에 따라 기존 12~41번 → 15~44번으로 순차 변경
+- `docs/optimize-steps.md` 단계 수 및 번호 동기화 (42 → 44)
+
+### Verification
+
+- 전체 44개 단계 번호 순서 연속성 확인 (`[1/44]`~`[44/44]`)
+- `$EnableNetBiosFirewallBlock`, `$EnableSmbFirewallBlock`, `$EnableNetBiosDisable` 옵션 변수 선언 및 코드 블록 연결 확인
+- `docs/optimize-steps.md` 13·14번 행 및 비활성 요약 테이블 단계 번호 일치 확인
+
 ## [26.1.22] - 2026-05-07
 
 ### Added
