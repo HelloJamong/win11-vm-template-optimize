@@ -287,6 +287,7 @@ Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
 | `$NewComputerName` | `'VDI-Win11'` | 컴퓨터 이름 변경 시 원하는 이름으로 수정 |
 | `$EnableComputerRename` | `$true` | 이름 변경이 불필요하면 `$false`로 변경 |
 | `$EnableStartMenuPinnedCleanup` | `$true` | 시작 메뉴를 Edge/탐색기/설정 3개만 남기고 초기화. 기존 레이아웃 유지 시 `$false` |
+| `$EnableSmbFirewallBlock` | `$true` | 445/TCP 인바운드 차단. 도메인 가입·파일 서버 연결 환경은 `$false`로 변경 |
 | `$Enable*` | 각 항목별 | 나머지 기능별 ON/OFF 스위치 |
 
 ### 주요 수행 작업
@@ -297,13 +298,16 @@ Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
 - Hibernation 비활성화
 - Appx 및 Provisioned Appx 제거
 - 서비스 / 예약 작업 비활성화
+- NetBIOS over TCP/IP 비활성화 (WMI, 전체 어댑터)
+- NetBIOS 포트 인바운드 차단 (137/UDP, 138/UDP, 139/TCP)
+- SMB 포트 인바운드 차단 (445/TCP) — 도메인 가입 환경은 건너뜀 권장
 - Search / Bing / Copilot / Recall / Consumer / Privacy 정책 설정
 - 로그인 옵션 / 앱 재시작 / 개인설정 시작 메뉴 / 개인정보 일반 조정
 - 전원 계획, 탐색기, 시작 메뉴, 작업 표시줄, 잠금 화면 조정
 - Edge 정책, 제어판 뷰, 부팅 타임아웃, 시스템 볼륨, 컴퓨터 이름 설정
 - cleanmgr / DISM component cleanup 실행
 
-전체 41개 단계가 `[N/41]` 형식으로 표시되며, 각 단계마다 수행 항목과 Y/n 확인이 제공됩니다.
+전체 44개 단계가 `[N/44]` 형식으로 표시되며, 각 단계마다 수행 항목과 Y/n 확인이 제공됩니다.
 `-NonInteractive` 옵션 사용 시 모든 단계가 확인 없이 자동으로 진행됩니다.
 
 ---
