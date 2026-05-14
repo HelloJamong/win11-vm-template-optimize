@@ -28,7 +28,7 @@
 |---|------|:------:|--------------|
 | 5 | 최대 절전 비활성화 | ✅ | `powercfg -h off` 실행, `hiberfil.sys` 제거 |
 | 6 | 전원 계획 및 절전 설정 조정 | ✅ | 고성능 전원 계획(`SCHEME_MIN`) 활성화 / 모니터·절전·최대절전 타임아웃 0으로 설정(AC/DC 모두) / 레지스트리 `GlobalFlags=0`, 잠금화면 표시 옵션 조정 |
-| 7 | Pagefile 비활성화 | ⬜ | 자동 pagefile 관리 해제, `C:\pagefile.sys` 삭제 시도 — 재부팅 후 검증 필요 |
+| 7 | Pagefile 비활성화 | ⬜ | 자동 pagefile 관리 해제 및 pagefile 설정 제거 시도 — 재부팅 후 `C:\pagefile.sys` 제거/검증 필요 |
 
 ---
 
@@ -36,7 +36,7 @@
 
 | # | 항목 | 기본값 | 주요 처리 내용 |
 |---|------|:------:|--------------|
-| 8 | Appx 앱 제거 | ✅ | Xbox, GamingApp, Clipchamp, ZuneMusic/Video, Camera, Teams, SkypeApp, YourPhone, CrossDevice, Mail&Calendar, OfficeHub, Outlook, Todos, PowerAutomate, OneNote, Copilot, Cortana, BingNews, BingWeather, Maps, Solitaire, People, StickyNotes, Alarms, FeedbackHub, GetHelp, Getstarted, DevHome, QuickAssist + `configs/appx-remove-list.txt` 추가 항목 |
+| 8 | Appx 앱 제거 | ✅ | Xbox, GamingApp, Clipchamp, ZuneMusic/Video, Teams, SkypeApp, YourPhone, CrossDevice, Mail&Calendar, OfficeHub, Outlook, Todos, PowerAutomate, OneNote, Copilot, Cortana, BingNews, BingWeather, Maps, Solitaire, People, StickyNotes, Alarms, FeedbackHub, GetHelp, Getstarted, DevHome, QuickAssist + `configs/appx-remove-list.txt` 추가 항목 |
 | 9 | Provisioned Appx 제거 | ✅ | 동일 패턴으로 `Get-AppxProvisionedPackage` 대상 제거 — 신규 사용자 생성 시 앱 재설치 방지 |
 | 10 | OneDrive 제거 | ✅ | `OneDriveSetup.exe /uninstall` (32bit/64bit 모두 시도), `ProgramData\Microsoft OneDrive`, `OneDriveTemp` 폴더 삭제 |
 
@@ -79,7 +79,7 @@
 | 22 | 로그인 옵션 조정 | ✅ | `DisableAutomaticRestartSignOn=1` — 업데이트/재시작 후 ARSO(자동 로그인 완료) 비활성화 |
 | 23 | 작업 표시줄 작업 종료 버튼 활성화 | ✅ | `TaskbarEndTask=1` — 작업 표시줄 우클릭 메뉴에 '작업 종료' 항목 표시 |
 | 24 | 앱 자동 재시작 비활성화 | ✅ | `RestartApps=0` — 로그인 시 이전 앱 자동 재시작 차단 |
-| 25 | Delivery Optimization 외부 공유 차단 | ✅ | `DODownloadMode=0` (Config + Policies 두 경로 모두 적용) |
+| 25 | Delivery Optimization 외부 공유 차단 | ✅ | Windows 업데이트 > 고급 옵션 > 다운로드 최적화 > 다른 장치에서 다운로드 허용 `끔` / `DODownloadMode=0` (Config + Policies 두 경로 모두 적용) — 불필요한 네트워크 트래픽 방지 |
 
 ### 5-4. 탐색기·UI
 

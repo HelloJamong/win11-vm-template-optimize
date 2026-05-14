@@ -302,7 +302,7 @@ Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
 - NetBIOS 포트 인바운드 차단 (137/UDP, 138/UDP, 139/TCP)
 - SMB 포트 인바운드 차단 (445/TCP) — 도메인 가입 환경은 건너뜀 권장
 - Search / Bing / Copilot / Recall / Consumer / Privacy 정책 설정
-- 로그인 옵션 / 앱 재시작 / 개인설정 시작 메뉴 / 개인정보 일반 조정
+- 로그인 옵션 / 앱 재시작 / Delivery Optimization 외부 공유 차단 / 개인설정 시작 메뉴 / 개인정보 일반 조정
 - 전원 계획, 탐색기, 시작 메뉴, 작업 표시줄, 잠금 화면 조정
 - Edge 정책, 제어판 뷰, 부팅 타임아웃, 시스템 볼륨, 컴퓨터 이름 설정
 - cleanmgr / DISM component cleanup 실행

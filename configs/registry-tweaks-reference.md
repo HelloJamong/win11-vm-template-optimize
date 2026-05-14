@@ -57,8 +57,8 @@
 | Consumer | `HKLM\SOFTWARE\Policies\Microsoft\Windows\CloudContent` | `DisableCloudOptimizedContent` | `1` | 클라우드 최적화 콘텐츠 제한 | 에디션/빌드별 적용 차이 가능 |
 | ContentDelivery | `HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager` | `SubscribedContent-*Enabled` | `0` | 사용자별 추천/제안 콘텐츠 제한 | Audit Mode Administrator 기준 HKCU에 먼저 적용됨 |
 | ContentDelivery | `HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager` | `SoftLandingEnabled` | `0` | Windows 팁/추천성 UI 제한 | 사용자 경험 변경 가능 |
-| Delivery Optimization | `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\DeliveryOptimization\Config` | `DODownloadMode` | `0` | Delivery Optimization 공유 제한 | 조직 WSUS/DO 정책과 충돌 여부 확인 |
-| Delivery Optimization | `HKLM\SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization` | `DODownloadMode` | `0` | 정책 기반 Delivery Optimization 제한 | GPO 적용 시 GPO가 우선 |
+| Delivery Optimization | `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\DeliveryOptimization\Config` | `DODownloadMode` | `0` | 다운로드 최적화 > 다른 장치에서 다운로드 허용 끔 | 불필요한 네트워크 트래픽 방지, 조직 WSUS/DO 정책과 충돌 여부 확인 |
+| Delivery Optimization | `HKLM\SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization` | `DODownloadMode` | `0` | 정책 기반 다른 장치 다운로드 허용 차단 | GPO 적용 시 GPO가 우선 |
 | Explorer | `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced` | `ShowSyncProviderNotifications` | `0` | 탐색기 동기화 공급자 알림 축소 | UI 알림 감소 목적 |
 | Explorer | `HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced` | `LaunchTo` | `1` | 파일 탐색기 시작 위치 조정 | 사용자별 설정 |
 | Start Personalization | `HKCU\Software\Microsoft\Windows\CurrentVersion\Start` | `VisiblePlaces` | `REG_BINARY` | 개인설정 > 시작 > 폴더에서 설정/파일 탐색기/다운로드만 표시 | 사용자별 설정이므로 실제 대상 사용자 계정에서 실행 필요 |

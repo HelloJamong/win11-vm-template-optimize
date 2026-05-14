@@ -6,6 +6,50 @@
 - `메이저버전`: 프로젝트 기준선 또는 운영 방식이 크게 바뀌는 변경입니다.
 - `마이너버전`: 동일 메이저 기준선 안에서 누적되는 기능/문서/검증 개선 변경입니다.
 
+## [26.2.2] - 2026-05-14
+
+### Changed
+
+- Appx 제거 후보에서 Camera(`Microsoft.WindowsCamera`, `*WindowsCamera*`) 제외
+  - 기본 Appx 패턴 및 `configs/appx-remove-list.txt`에서 제거
+  - `docs/optimize-steps.md` Appx 제거 항목 설명 동기화
+- Delivery Optimization 단계 설명 보강
+  - Windows 업데이트 > 고급 옵션 > 다운로드 최적화 > 다른 장치에서 다운로드 허용 `끔` 항목을 `[25/44]`에 명시
+  - `DODownloadMode=0` 적용 목적을 불필요한 네트워크 트래픽 방지로 문서화
+  - `docs/guide.md`, `docs/optimize-steps.md`, `configs/registry-tweaks-reference.md` 설명 동기화
+
+### Verification
+
+- `WindowsCamera` 제거 후보 잔존 여부 확인
+- `DODownloadMode` 적용 위치 및 문서 설명 확인
+- 최적화 스크립트 단계 번호 `[1/44]`~`[44/44]` 연속성 확인
+- `unattend.xml` XML well-formed 검증 통과
+- `git diff --check` 통과
+
+## [26.2.1] - 2026-05-14
+
+### Added
+
+- GitHub Actions release workflow에 Windows 기반 검증 job 추가
+  - PowerShell Parser로 주요 `.ps1` 파일 4종 문법 검증
+  - `unattend.xml` XML 파싱 검증
+  - PSScriptAnalyzer advisory check 추가 (실행 실패/경고는 릴리스 게이트로 취급하지 않음)
+
+### Changed
+
+- `scripts/build-vm-optimize-iso.ps1`의 `configs` 경로 탐색을 배포 ZIP/개발 트리 양쪽에서 동작하도록 수정
+- `scripts/win11_master_template_optimize.ps1` 캐시 정리 서비스 중지/재시작을 단계 내부 `try/finally` 흐름으로 변경
+- 빈 `catch {}` 구간을 경고 로그 기록 방식으로 전환해 런타임 실패 추적성을 개선
+- Pagefile 비활성화 설명을 실제 동작에 맞게 설정 제거 및 재부팅 후 검증 필요로 정정
+
+### Verification
+
+- `unattend.xml` XML well-formed 검증 통과
+- 최적화 스크립트 단계 번호 `[1/44]`~`[44/44]` 연속성 확인
+- 메인 최적화 스크립트 내 빈 `catch {}` 제거 확인
+- `git diff --check` 통과
+- 현재 Linux 실행 환경에 `pwsh`/`powershell`이 없어 PowerShell Parser 검증은 CI job으로 추가하고 로컬에서는 미수행
+
 ## [26.2.0] - 2026-05-14
 
 ### Added

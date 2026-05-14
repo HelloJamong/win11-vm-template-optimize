@@ -16,7 +16,67 @@ permissions:
   contents: write
 
 jobs:
+  validate:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate PowerShell syntax and XML
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $scripts = @(
+            'scripts/win11_master_template_optimize.ps1',
+            'scripts/build-vm-optimize-iso.ps1',
+            'scripts/sysprep/first_logon.ps1',
+            'scripts/sysprep/build-unattend-iso.ps1'
+          )
+
+          foreach ($script in $scripts) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path $script),
+              [ref] $tokens,
+              [ref] $errors
+            ) | Out-Null
+
+            if ($errors.Count -gt 0) {
+              $errors | Format-List | Out-String | Write-Error
+              throw "PowerShell parse failed: $script"
+            }
+
+            Write-Host "PowerShell parse OK: $script"
+          }
+
+          [xml] $unattend = Get-Content -LiteralPath 'scripts/sysprep/unattend.xml' -Raw
+          if (-not $unattend.unattend) {
+            throw 'unattend.xml root element not found.'
+          }
+          Write-Host 'XML parse OK: scripts/sysprep/unattend.xml'
+
+      - name: Run PSScriptAnalyzer advisory check
+        shell: pwsh
+        run: |
+          try {
+            $ErrorActionPreference = 'Stop'
+            Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
+            $results = Invoke-ScriptAnalyzer -Path scripts -Recurse
+            if ($results) {
+              $results | Format-Table -AutoSize
+              Write-Warning "PSScriptAnalyzer reported advisory findings. Parser validation remains the release gate."
+            } else {
+              Write-Host 'PSScriptAnalyzer advisory check OK.'
+            }
+          } catch {
+            Write-Warning "PSScriptAnalyzer advisory check could not run: $_"
+          }
+
   release:
+    needs: validate
     runs-on: ubuntu-latest
 
     steps:

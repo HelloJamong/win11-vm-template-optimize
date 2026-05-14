@@ -14,7 +14,6 @@ Microsoft.People
 Microsoft.PowerAutomateDesktop
 Microsoft.Todos
 Microsoft.WindowsAlarms
-Microsoft.WindowsCamera
 Microsoft.WindowsCommunicationsApps
 Microsoft.WindowsFeedbackHub
 Microsoft.WindowsMaps

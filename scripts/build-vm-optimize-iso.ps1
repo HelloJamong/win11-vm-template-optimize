@@ -119,7 +119,12 @@ function New-IsoFromDirectory {
 $isoSourceDir  = Join-Path $PSScriptRoot '_iso'
 $repoRoot      = Split-Path $PSScriptRoot -Parent
 $mainScript    = Join-Path $PSScriptRoot 'win11_master_template_optimize.ps1'
-$configsSrc    = Join-Path $repoRoot 'configs'
+# 배포 ZIP(스크립트와 configs/ 동일 레벨)과 개발 트리(scripts/ 하위) 모두 지원합니다.
+$configsSrc    = if (Test-Path (Join-Path $PSScriptRoot 'configs')) {
+    Join-Path $PSScriptRoot 'configs'
+} else {
+    Join-Path $repoRoot 'configs'
+}
 
 # ── 안내 메세지 ────────────────────────────────────────────────
 
